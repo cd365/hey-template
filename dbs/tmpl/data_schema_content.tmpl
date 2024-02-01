@@ -1,0 +1,193 @@
+
+type {{{.TableNamePascal}}} struct {
+	tab *model.Hey{{{.TableNamePascal}}}
+	way hey.WayWriterReader
+}
+
+// New{{{.TableNamePascal}}} {{{.TableName}}} {{{.TableComment}}}
+func New{{{.TableNamePascal}}}(
+	tab *model.Hey{{{.TableNamePascal}}},
+	way hey.WayWriterReader,
+) *{{{.TableNamePascal}}} {
+	return &{{{.TableNamePascal}}}{
+		tab: tab,
+		way: way,
+	}
+}
+
+func (s *{{{.TableNamePascal}}}) T() *model.Hey{{{.TableNamePascal}}} {
+    return s.tab
+}
+
+func (s *{{{.TableNamePascal}}}) W(way ...*hey.Way) *hey.Way {
+	return OptionWay(s.way.W(), way...)
+}
+
+func (s *{{{.TableNamePascal}}}) R(way ...*hey.Way) *hey.Way {
+	return OptionWay(s.way.R(), way...)
+}
+
+func (s *{{{.TableNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
+	return s.way.R().F(filters...)
+}
+
+func (s *{{{.TableNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
+	return s.W(way...).Add(s.tab.Table())
+}
+
+func (s *{{{.TableNamePascal}}}) Del(way ...*hey.Way) *hey.Del {
+	return s.W(way...).Del(s.tab.Table())
+}
+
+func (s *{{{.TableNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
+	return s.W(way...).Mod(s.tab.Table())
+}
+
+func (s *{{{.TableNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
+	return s.R(way...).Get(s.tab.Table()).Column(s.tab.Field()...)
+}
+
+func (s *{{{.TableNamePascal}}}) Table() string {
+    return s.tab.Table()
+}
+
+func (s *{{{.TableNamePascal}}}) Field() []string {
+    return s.tab.Field()
+}
+
+func (s *{{{.TableNamePascal}}}) FieldMap() map[string]struct{} {
+	return s.tab.FieldMap()
+}
+
+func (s *{{{.TableNamePascal}}}) FieldExist(field string) bool {
+    return s.tab.FieldExist(field)
+}
+
+func (s *{{{.TableNamePascal}}}) CreatedAt() []string {
+	return s.tab.FieldCreatedAt()
+}
+
+func (s *{{{.TableNamePascal}}}) UpdatedAt() []string {
+	return s.tab.FieldUpdatedAt()
+}
+
+func (s *{{{.TableNamePascal}}}) DeletedAt() []string {
+	return s.tab.FieldDeletedAt()
+}
+
+func (s *{{{.TableNamePascal}}}) AddExcept() []string {
+	return s.tab.FieldAutoIncr()
+}
+
+func (s *{{{.TableNamePascal}}}) ModExcept() (result []string) {
+	result = s.AddExcept()
+	result = append(result, s.tab.FieldCreatedAt()...)
+	return
+}
+
+func (s *{{{.TableNamePascal}}}) Create(create interface{}, way ...*hey.Way) (int64, error) {
+	return s.ThisInsert(func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}) { add.Create(create) }, way...)
+}
+
+func (s *{{{.TableNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int64, error) {
+	return s.Del(way...).Where(filter).Del()
+}
+
+func (s *{{{.TableNamePascal}}}) Update(update func(mod *hey.Mod), way ...*hey.Way) (int64, error) {
+	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) { update(mod) }, way...)
+}
+
+func (s *{{{.TableNamePascal}}}) Modify(filter hey.Filter, modify interface{}, way ...*hey.Way) (int64, error) {
+	return s.ThisModify(func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}) { w.Filter(filter) }, modify, way...)
+}
+
+func (s *{{{.TableNamePascal}}}) Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error {
+	tmp := s.Get(way...)
+	get(tmp)
+	return tmp.Query(query)
+}
+
+func (s *{{{.TableNamePascal}}}) SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error {
+	tmp := s.Get(way...)
+	get(tmp)
+	return tmp.Get(result)
+}
+
+func (s *{{{.TableNamePascal}}}) ThisGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.TableNamePascal}}}, err error) {
+	tmp := s.Get(way...)
+	query(tmp)
+	err = tmp.Get(&result)
+	return
+}
+
+func (s *{{{.TableNamePascal}}}) ThisGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.TableNamePascal}}}, error) {
+	tmp, err := s.ThisGetAll(func(get *hey.Get) {
+		query(get)
+		get.Limit(1)
+	}, way...)
+	if err != nil {
+		return nil, err
+	}
+	if len(tmp) > 0 {
+		return tmp[0], nil
+	}
+	return nil, nil
+}
+
+func (s *{{{.TableNamePascal}}}) ThisSubGet(query func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}})) *hey.Get {
+	get := s.Get()
+	if query != nil {
+		query(get, s.tab)
+	}
+	return get
+}
+
+func (s *{{{.TableNamePascal}}}) ThisInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Add(way...).Except(s.AddExcept()...)
+	fc(tmp, s.tab)
+	timestamp := s.W(way...).Now().Unix()
+    for _, field := range s.CreatedAt() {
+        tmp.DefaultFieldValue(field, timestamp)
+    }
+    for _, field := range s.UpdatedAt() {
+        tmp.DefaultFieldValue(field, timestamp)
+    }
+	return tmp.Add()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Del(way...)
+	w := s.F()
+    fc(w, s.tab)
+	return tmp.Where(w).Del()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Mod(way...).Except(s.ModExcept()...)
+	fc(tmp, s.tab)
+    timestamp := s.W(way...).Now().Unix()
+   	for _, field := range s.UpdatedAt() {
+   		tmp.DefaultSet(field, timestamp)
+   	}
+	return tmp.Mod()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisModify(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), modify interface{}, way ...*hey.Way) (int64, error) {
+	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
+		w := s.F()
+        fc(w, t)
+        mod.Where(w)
+        update, ok := modify.(map[string]interface{})
+        if !ok {
+            fields, values := hey.StructModify(update, s.W().Tag())
+            for index, field := range fields {
+                update[field] = values[index]
+            }
+        }
+        for k, v := range update {
+            if s.FieldExist(k) {
+                mod.Set(k, v)
+            }
+        }
+	}, way...)
+}

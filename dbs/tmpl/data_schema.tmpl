@@ -1,0 +1,44 @@
+package data
+
+import (
+    "database/sql"
+
+	"github.com/cd365/hey"
+
+	"{{{.ImportModelPackage}}}"
+)
+
+type Faster interface {
+	W(way ...*hey.Way) *hey.Way
+    R(way ...*hey.Way) *hey.Way
+    F(filters ...hey.Filter) hey.Filter
+    Add(way ...*hey.Way) *hey.Add
+    Del(way ...*hey.Way) *hey.Del
+    Mod(way ...*hey.Way) *hey.Mod
+    Get(way ...*hey.Way) *hey.Get
+    Table() string
+    Field() []string
+    FieldMap() map[string]struct{}
+    FieldExist(field string) bool
+    CreatedAt() []string
+    UpdatedAt() []string
+    DeletedAt() []string
+    AddExcept() []string
+    ModExcept() []string
+    Create(create interface{}, way ...*hey.Way) (int64, error)
+    Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
+    Update(update func(mod *hey.Mod), way ...*hey.Way) (int64, error)
+    Modify(filter hey.Filter, modify interface{}, way ...*hey.Way) (int64, error)
+    Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
+    SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
+}
+
+func OptionWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
+	for i := len(options) - 1; i >= 0; i-- {
+		if options[i] != nil {
+			return options[i]
+		}
+	}
+	return defaultWay
+}
+{{{.DataAllTablesSchemaContent}}}
