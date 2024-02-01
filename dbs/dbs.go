@@ -41,6 +41,7 @@ type Caller interface {
 }
 
 type Param struct {
+	Version                 string   // template version
 	Driver                  string   // driver name
 	DataSourceName          string   // data source name
 	DatabaseSchemaName      string   // 数据库模式名称
@@ -193,51 +194,6 @@ func (s *SysTable) comment() string {
 	return *s.TableComment
 }
 
-func (s *SysTable) queryComment(schema string) (err error) {
-	if s.TableName == nil || s.way == nil || schema == "" {
-		return
-	}
-	prepare := "SELECT cast(obj_description(relfilenode, 'pg_class') AS VARCHAR) AS table_comment FROM pg_tables LEFT OUTER JOIN pg_class ON pg_tables.tablename = pg_class.relname WHERE ( pg_tables.schemaname = ? AND pg_tables.tablename = ? ) ORDER BY pg_tables.schemaname ASC LIMIT 1"
-	if err = s.way.Query(func(rows *sql.Rows) (err error) {
-		if !rows.Next() {
-			return
-		}
-		comment := sql.NullString{}
-		if err = rows.Scan(&comment); err != nil {
-			return
-		}
-		if comment.Valid {
-			s.TableComment = &comment.String
-		} else {
-			s.TableComment = new(string)
-		}
-		return
-	}, prepare, schema, *s.TableName); err != nil {
-		return
-	}
-	if s.TableComment == nil {
-		s.TableComment = new(string)
-	}
-	return
-}
-
-func (s *SysTable) queryColumns(schema string) (err error) {
-	if s.TableName == nil || s.way == nil || schema == "" {
-		return
-	}
-	prepare := "SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, COLUMN_NAME AS column_name, ORDINAL_POSITION AS ordinal_position, COLUMN_DEFAULT AS column_default, IS_NULLABLE AS is_nullable, DATA_TYPE AS data_type, CHARACTER_MAXIMUM_LENGTH AS character_maximum_length, CHARACTER_OCTET_LENGTH AS character_octet_length, NUMERIC_PRECISION AS numeric_precision, NUMERIC_SCALE AS numeric_scale, CHARACTER_SET_NAME AS character_set_name, COLLATION_NAME AS collation_name, COLUMN_COMMENT AS column_comment, COLUMN_TYPE AS column_type, COLUMN_KEY AS column_key, EXTRA AS extra FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ordinal_position ASC"
-	s.Column = make([]*SysColumn, 0)
-	if err = s.way.ScanAll(&s.Column, prepare, schema, *s.TableName); err != nil {
-		return
-	}
-	for k, v := range s.Column {
-		if v.ColumnComment == nil {
-			s.Column[k].ColumnComment = new(string)
-		}
-	}
-	return
-}
-
 // SysColumn 表字段结构
 type SysColumn struct {
 	TableSchema            *string `db:"table_schema"`             // 数据库名
@@ -336,7 +292,9 @@ func (s *Param) createModel() error {
 	temp := NewTemplate("tmpl_wire", tmplWire)
 	buf := bytes.NewBuffer(nil)
 	pkg := "model"
-	if err := temp.Execute(buf, buildWire(pkg, s.caller.Tables())); err != nil {
+	data := buildWire(pkg, s.caller.Tables())
+	data.Version = s.Version
+	if err := temp.Execute(buf, data); err != nil {
 		return err
 	}
 	return CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg)))
@@ -348,21 +306,19 @@ func (s *Param) createModelSchema() error {
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
 	buf := bytes.NewBuffer(nil)
 	for _, table := range s.caller.Tables() {
-		if err := tmpModelSchemaContent.Execute(
-			buf,
-			s.createModelSchemaTable(table),
-		); err != nil {
+		data := s.createModelSchemaTable(table)
+		data.Version = s.Version
+		if err := tmpModelSchemaContent.Execute(buf, data); err != nil {
 			return err
 		}
 	}
 
 	content := bytes.NewBuffer(nil)
-	if err := tmpModelSchema.Execute(
-		content,
-		&ModelSchemas{
-			Content: buf.String(),
-		},
-	); err != nil {
+	data := &ModelSchemas{
+		Version: s.Version,
+		Content: buf.String(),
+	}
+	if err := tmpModelSchema.Execute(content, data); err != nil {
 		return err
 	}
 
@@ -374,7 +330,9 @@ func (s *Param) createData() (err error) {
 	temp := NewTemplate("tmpl_wire", tmplWire)
 	buf := bytes.NewBuffer(nil)
 	pkg := "data"
-	if err = temp.Execute(buf, buildWire(pkg, s.caller.Tables())); err != nil {
+	data := buildWire(pkg, s.caller.Tables())
+	data.Version = s.Version
+	if err = temp.Execute(buf, data); err != nil {
 		return
 	}
 	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg)))
@@ -388,22 +346,20 @@ func (s *Param) createDataSchema() error {
 
 	buf := bytes.NewBuffer(nil)
 	for _, table := range s.caller.Tables() {
-		if err := tmpDataSchemaContent.Execute(
-			buf,
-			s.createDataSchemaTable(table),
-		); err != nil {
+		data := s.createDataSchemaTable(table)
+		data.Version = s.Version
+		if err := tmpDataSchemaContent.Execute(buf, data); err != nil {
 			return err
 		}
 	}
 
 	outer := bytes.NewBuffer(nil)
-	if err := tmpDataSchema.Execute(
-		outer,
-		&DataSchemas{
-			ImportModelPackage:         s.ImportModelPackageName,
-			DataAllTablesSchemaContent: buf.String(),
-		},
-	); err != nil {
+	data := &DataSchemas{
+		Version:                    s.Version,
+		ImportModelPackage:         s.ImportModelPackageName,
+		DataAllTablesSchemaContent: buf.String(),
+	}
+	if err := tmpDataSchema.Execute(outer, data); err != nil {
 		return err
 	}
 
@@ -438,20 +394,24 @@ func (s *Param) BuildAll() error {
 }
 
 type DataSchemas struct {
+	Version                    string // template version
 	ImportModelPackage         string
 	DataAllTablesSchemaContent string
 }
 
 type Wires struct {
+	Version           string // template version
 	DefinePackageName string // package name
 	WireContent       string // wire content
 }
 
 type ModelSchemas struct {
+	Version string // template version
 	Content string
 }
 
 type CreateDataSchemaTable struct {
+	Version         string // template version
 	TableNamePascal string // 表名(帕斯卡命名) ==> AccountMoneyLog
 	TableName       string // 表名(数据库原始命名) ==> account_money_log
 	TableNameSchema string // 表名(带数据库模式前缀名) ==> public.account_money_log
@@ -476,6 +436,7 @@ func (s *Param) createDataSchemaTable(table *SysTable) (model *CreateDataSchemaT
 }
 
 type CreateModelSchemaTable struct {
+	Version             string // template version
 	TableNamePascal     string // 表名(帕斯卡命名) ==> AccountMoneyLog
 	TableName           string // 表名(数据库原始命名) ==> account_money_log
 	TableNameWithSchema string // 表名(带数据库模式前缀名) ==> public.account_money_log

@@ -6,7 +6,13 @@ import (
 	"main/dbs"
 )
 
-var param = &dbs.Param{}
+const (
+	Version = "v0.0.1"
+)
+
+var param = &dbs.Param{
+	Version: Version,
+}
 
 func init() {
 	flag.StringVar(&param.Driver, "d", "postgres", "driver name: mysql postgres")                                                                                      // driver name
