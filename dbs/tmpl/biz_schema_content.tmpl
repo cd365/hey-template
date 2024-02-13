@@ -1,0 +1,16 @@
+
+type {{{.TableNamePascal}}} struct {
+    way hey.WayWriterReader
+	{{{.TableNameSmallPascal}}} *data.{{{.TableNamePascal}}}
+}
+
+// New{{{.TableNamePascal}}} {{{.TableName}}} {{{.TableComment}}}
+func New{{{.TableNamePascal}}}(
+    way hey.WayWriterReader,
+	{{{.TableNameSmallPascal}}} *data.{{{.TableNamePascal}}},
+) *{{{.TableNamePascal}}} {
+	return &{{{.TableNamePascal}}}{
+	    way: way,
+		{{{.TableNameSmallPascal}}}: {{{.TableNameSmallPascal}}},
+	}
+}

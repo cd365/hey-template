@@ -1,5 +1,5 @@
-github.com/cd365/hey v0.0.0-20240118132559-1dc73cf8b3c6 h1:noeeaXdJ/H+mwioa8VC/33oLm/OFoKMzvyzW05kZTwE=
-github.com/cd365/hey v0.0.0-20240118132559-1dc73cf8b3c6/go.mod h1:ZYmPzjSmxYNX6UJtKm2g6KOY4Q6APm40I3w7n0F7Xcs=
+github.com/cd365/hey v1.1.1-0.20240204073943-4cc19ba2dc7c h1:hShiZZ163Vm73F/aTo2dIKIZqUUyFvdSDvfED5HBHRU=
+github.com/cd365/hey v1.1.1-0.20240204073943-4cc19ba2dc7c/go.mod h1:WGrXsqqp7Wcc8xIa0pYak3LU0XCX/rI8uNYGtORUjbw=
 github.com/go-sql-driver/mysql v1.7.1 h1:lUIinVbN1DY0xBg0eMOzmmtGoHwWBbvnWubQUrtU8EI=
 github.com/go-sql-driver/mysql v1.7.1/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=

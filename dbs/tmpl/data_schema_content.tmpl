@@ -85,20 +85,76 @@ func (s *{{{.TableNamePascal}}}) ModExcept() (result []string) {
 	return
 }
 
-func (s *{{{.TableNamePascal}}}) Create(create interface{}, way ...*hey.Way) (int64, error) {
-	return s.ThisInsert(func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}) { add.Create(create) }, way...)
+func (s *{{{.TableNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
+	timestamp := s.W(way...).Now().Unix()
+	for _, field := range s.CreatedAt() {
+		add.DefaultFieldValue(field, timestamp)
+	}
+	for _, field := range s.UpdatedAt() {
+		add.DefaultFieldValue(field, timestamp)
+	}
+}
+
+func (s *{{{.TableNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
+	timestamp := s.W(way...).Now().Unix()
+	for _, field := range s.UpdatedAt() {
+		mod.DefaultSet(field, timestamp)
+	}
+}
+
+func (s *{{{.TableNamePascal}}}) NotExistsIndex(fields []string) []int {
+	result := make([]int, 0)
+	for k, v := range fields {
+		if !s.FieldExist(v) {
+			result = append(result, k)
+		}
+	}
+	return result
+}
+
+func (s *{{{.TableNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
+	return s.ThisInsert(func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}) {
+        if mp, ok := insert.(map[string]interface{}); ok {
+            for k, v := range mp {
+                if s.FieldExist(k) {
+                    add.FieldValue(k, v)
+                }
+            }
+            return
+        }
+        fields, values := hey.StructInsert(insert, s.W(way...).Tag(), s.AddExcept()...)
+        if index := s.NotExistsIndex(fields); len(index) > 0 {
+            fields = hey.RemoveSliceMemberByIndex(index, fields)
+            for k, v := range values {
+                values[k] = hey.RemoveSliceMemberByIndex(index, v)
+            }
+        }
+        add.FieldsValues(fields, values)
+        return
+    })
 }
 
 func (s *{{{.TableNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int64, error) {
 	return s.Del(way...).Where(filter).Del()
 }
 
-func (s *{{{.TableNamePascal}}}) Update(update func(mod *hey.Mod), way ...*hey.Way) (int64, error) {
-	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) { update(mod) }, way...)
-}
-
-func (s *{{{.TableNamePascal}}}) Modify(filter hey.Filter, modify interface{}, way ...*hey.Way) (int64, error) {
-	return s.ThisModify(func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}) { w.Filter(filter) }, modify, way...)
+func (s *{{{.TableNamePascal}}}) Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error) {
+	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
+		mod.Where(s.F().Filter(filter))
+		tmp, ok := update.(map[string]interface{})
+		if !ok {
+		    tmp = make(map[string]interface{})
+			fields, values := hey.StructModify(update, s.W().Tag(), s.ModExcept()...)
+			for index, field := range fields {
+				tmp[field] = values[index]
+			}
+		}
+		for k, v := range tmp {
+			if s.FieldExist(k) {
+				mod.Set(k, v)
+			}
+		}
+	}, way...)
 }
 
 func (s *{{{.TableNamePascal}}}) Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error {
@@ -111,6 +167,33 @@ func (s *{{{.TableNamePascal}}}) SelectGet(get func(get *hey.Get), result interf
 	tmp := s.Get(way...)
 	get(tmp)
 	return tmp.Get(result)
+}
+
+func (s *{{{.TableNamePascal}}}) Count(filter hey.Filter) (int64, error) {
+	return s.Get().SubQueryGet(s.ThisSubGet(func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}}) {
+		get.Where(s.F(filter))
+	}), s.R().Identifier(model.TableAliasA).V()).Count()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Add(way...).Except(s.AddExcept()...)
+	fc(tmp, s.tab)
+	s.AddAt(tmp, way...)
+	return tmp.Add()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Del(way...)
+	w := s.F()
+    fc(w, s.tab)
+	return tmp.Where(w).Del()
+}
+
+func (s *{{{.TableNamePascal}}}) ThisUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Mod(way...).Except(s.ModExcept()...)
+	fc(tmp, s.tab)
+    s.ModAt(tmp, way...)
+	return tmp.Mod()
 }
 
 func (s *{{{.TableNamePascal}}}) ThisGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.TableNamePascal}}}, err error) {
@@ -140,54 +223,4 @@ func (s *{{{.TableNamePascal}}}) ThisSubGet(query func(get *hey.Get, t *model.He
 		query(get, s.tab)
 	}
 	return get
-}
-
-func (s *{{{.TableNamePascal}}}) ThisInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
-	tmp := s.Add(way...).Except(s.AddExcept()...)
-	fc(tmp, s.tab)
-	timestamp := s.W(way...).Now().Unix()
-    for _, field := range s.CreatedAt() {
-        tmp.DefaultFieldValue(field, timestamp)
-    }
-    for _, field := range s.UpdatedAt() {
-        tmp.DefaultFieldValue(field, timestamp)
-    }
-	return tmp.Add()
-}
-
-func (s *{{{.TableNamePascal}}}) ThisDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
-	tmp := s.Del(way...)
-	w := s.F()
-    fc(w, s.tab)
-	return tmp.Where(w).Del()
-}
-
-func (s *{{{.TableNamePascal}}}) ThisUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
-	tmp := s.Mod(way...).Except(s.ModExcept()...)
-	fc(tmp, s.tab)
-    timestamp := s.W(way...).Now().Unix()
-   	for _, field := range s.UpdatedAt() {
-   		tmp.DefaultSet(field, timestamp)
-   	}
-	return tmp.Mod()
-}
-
-func (s *{{{.TableNamePascal}}}) ThisModify(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), modify interface{}, way ...*hey.Way) (int64, error) {
-	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
-		w := s.F()
-        fc(w, t)
-        mod.Where(w)
-        update, ok := modify.(map[string]interface{})
-        if !ok {
-            fields, values := hey.StructModify(update, s.W().Tag())
-            for index, field := range fields {
-                update[field] = values[index]
-            }
-        }
-        for k, v := range update {
-            if s.FieldExist(k) {
-                mod.Set(k, v)
-            }
-        }
-	}, way...)
 }

@@ -4,6 +4,19 @@ type {{{.TableNamePascal}}} struct {
 {{{range $k, $v := .TableStructColumn}}}{{{$v}}}{{{end}}}
 }
 
+func (s *{{{.TableNamePascal}}}) HeyClone() *{{{.TableNamePascal}}} {
+	tmp := *s
+	return &tmp
+}
+
+func (s *{{{.TableNamePascal}}}) HeyCompare(c *{{{.TableNamePascal}}}) map[string]interface{} {
+	tmp := make(map[string]interface{}){{{.TableStructColumnUpdate}}}
+	if len(tmp) == 0 {
+        return nil
+    }
+	return tmp
+}
+
 type Hey{{{.TableNamePascal}}} struct {
 {{{range $k, $v := .TableStructColumnHey}}}{{{$v}}}{{{end}}}
     fieldMap map[string]struct{}

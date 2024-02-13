@@ -1,4 +1,4 @@
-// hey-template version: {{{.Version}}}
+// hey-template version: {{{.TemplateVersion}}}
 
 package data
 
@@ -7,7 +7,7 @@ import (
 
 	"github.com/cd365/hey"
 
-	"{{{.ImportModelPackage}}}"
+	"{{{.DataImportModelPackageName}}}"
 )
 
 type Faster interface {
@@ -27,12 +27,17 @@ type Faster interface {
     DeletedAt() []string
     AddExcept() []string
     ModExcept() []string
-    Create(create interface{}, way ...*hey.Way) (int64, error)
+    AddAt(add *hey.Add, way ...*hey.Way)
+    ModAt(mod *hey.Mod, way ...*hey.Way)
+    NotExistsIndex(fields []string) []int
+    // Insert the inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct
+    Insert(insert interface{}, way ...*hey.Way) (int64, error)
     Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
-    Update(update func(mod *hey.Mod), way ...*hey.Way) (int64, error)
-    Modify(filter hey.Filter, modify interface{}, way ...*hey.Way) (int64, error)
+    // Update the object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct
+    Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error)
     Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
+    Count(filter hey.Filter) (int64, error)
 }
 
 func OptionWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {

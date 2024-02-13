@@ -1,6 +1,9 @@
 package dbs
 
 import (
+	"database/sql"
+	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/cd365/hey"
@@ -66,4 +69,28 @@ func (s *Mysql) getAllColumns(schema string, table string) (list []*SysColumn, e
 
 func (s *Mysql) Tables() []*SysTable {
 	return s.tables
+}
+
+func (s *Mysql) ShowCreateTable(table *SysTable) (string, error) {
+	for _, c := range table.Column {
+		if c.Extra != nil && strings.ToLower(*c.Extra) == "auto_increment" {
+			table.TableAutoIncrement = *c.ColumnName
+		}
+	}
+	prepare := fmt.Sprintf("SHOW CREATE TABLE %s.%s", *table.TableSchema, *table.TableName)
+	name, result := "", ""
+	err := s.way.Query(func(rows *sql.Rows) error {
+		for rows.Next() {
+			if err := rows.Scan(&name, &result); err != nil {
+				return err
+			}
+			return nil
+		}
+		return nil
+	}, prepare)
+	if err != nil {
+		return "", err
+	}
+	result = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+	return result, nil
 }

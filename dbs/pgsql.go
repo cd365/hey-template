@@ -2,6 +2,9 @@ package dbs
 
 import (
 	"database/sql"
+	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/cd365/hey"
@@ -140,4 +143,38 @@ func (s *Pgsql) queryColumns(schema string, table string) (list []*SysColumn, er
 
 func (s *Pgsql) Tables() []*SysTable {
 	return s.tables
+}
+
+var pgSeq = regexp.MustCompile(`^nextval\('([A-Za-z0-9_]+)'::regclass\)$`)
+
+func (s *Pgsql) ShowCreateTable(table *SysTable) (string, error) {
+	var createSequence string
+	for _, c := range table.Column {
+		if c.ColumnDefault != nil && pgSeq.MatchString(*c.ColumnDefault) {
+			result := pgSeq.FindAllStringSubmatch(*c.ColumnDefault, -1)
+			if len(result) == 1 && len(result[0]) == 2 && result[0][1] != "" {
+				createSequence = fmt.Sprintf("CREATE SEQUENCE IF NOT EXISTS %s START 1;\n", result[0][1])
+				table.TableAutoIncrement = *c.ColumnName
+			}
+		}
+	}
+	prepare := fmt.Sprintf("SELECT show_create_table_schema('%s', '%s')", *table.TableSchema, *table.TableName)
+	result := ""
+	err := s.way.Query(func(rows *sql.Rows) error {
+		for rows.Next() {
+			if err := rows.Scan(&result); err != nil {
+				return err
+			}
+			return nil
+		}
+		return nil
+	}, prepare)
+	if err != nil {
+		return "", err
+	}
+	result = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+	result = strings.ReplaceAll(result, "CREATE INDEX", "CREATE INDEX IF NOT EXISTS")
+	result = strings.ReplaceAll(result, "CREATE UNIQUE INDEX", "CREATE UNIQUE INDEX IF NOT EXISTS")
+	result = createSequence + result
+	return result, nil
 }

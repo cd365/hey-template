@@ -38,6 +38,7 @@ const (
 type Caller interface {
 	Queries() error
 	Tables() []*SysTable
+	ShowCreateTable(table *SysTable) (string, error)
 }
 
 type Param struct {
@@ -72,6 +73,18 @@ var (
 
 	//go:embed tmpl/data_schema_content.tmpl
 	tmplDataSchemaContent []byte
+
+	//go:embed tmpl/biz_schema.tmpl
+	tmplBizSchema []byte
+
+	//go:embed tmpl/biz_schema_content.tmpl
+	tmplBizSchemaContent []byte
+
+	//go:embed pgsql_func_create.sql
+	pgsqlFuncCreate string
+
+	//go:embed pgsql_func_drop.sql
+	pgsqlFuncDrop string
 )
 
 var (
@@ -173,11 +186,12 @@ func CopyReaderToFile(writer io.Reader, filename string) error {
 
 // SysTable 数据库表结构
 type SysTable struct {
-	way          *hey.Way     `db:"-"`
-	TableSchema  *string      `db:"table_schema"`  // 数据库名
-	TableName    *string      `db:"table_name"`    // 表名
-	TableComment *string      `db:"table_comment"` // 表注释
-	Column       []*SysColumn `db:"-"`             // 表中的所有字段
+	way                *hey.Way     `db:"-"`
+	TableSchema        *string      `db:"table_schema"`  // 数据库名
+	TableName          *string      `db:"table_name"`    // 表名
+	TableComment       *string      `db:"table_comment"` // 表注释
+	TableAutoIncrement string       `db:"-"`             // 表自动递增字段名称
+	Column             []*SysColumn `db:"-"`             // 表中的所有字段
 }
 
 func (s *SysTable) pascal() string {
@@ -262,6 +276,52 @@ func (s *SysColumn) comment() string {
 	return *s.ColumnComment
 }
 
+type TemplateData struct {
+	// version
+	TemplateVersion string // template version
+
+	// biz
+	BizImportDataPackageName  string // biz.go data import model package name
+	BizAllTablesSchemaContent string // biz.go data all tables schema content
+
+	// data
+	DataImportModelPackageName string // data.go data import model package name
+	DataAllTablesSchemaContent string // data.go data all tables schema content
+
+	// wire
+	WireDefinePackageName string // wire.go define package name
+	WireContent           string // wire.go content
+
+	// table
+	TableNamePascal      string // 表名(帕斯卡命名)
+	TableName            string // 数据库原始表名
+	TableNameSchema      string // 表模式名称或者数据库名称(表前缀名)
+	TableComment         string // 表注释
+	TableNameWithSchema  string // 表名(带前缀)
+	TableNameSmallPascal string // 表名(小帕斯卡命名)
+
+	// model
+	ModelAllTablesSchemaContent         string   // model.go model all tables schema content
+	TableStructColumn                   []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
+	TableStructColumnHey                []string // 表结构体字段关系定义 ==> Name string // name 名称
+	TableStructColumnHeyFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
+	TableStructColumnHeyFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
+	TableStructColumnReq                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
+	TableStructColumnUpdate             string   // 表结构体字段更新 ==> if s.Id != t.Id { tmp["id"] = t.Id }
+
+	TableStructColumnHeyValues          []string // NewHey.Attribute ==> Name:"name", // 名称
+	TableStructColumnHeyValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
+	TableStructColumnHeyValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
+
+	TableColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
+	TableColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
+	TableColumnUpdatedAt string // 结构体字段方法 ColumnUpdatedAt
+	TableColumnDeletedAt string // 结构体字段方法 ColumnDeletedAt
+
+	// ddl
+	TableDdl string // table ddl
+}
+
 func bufferTable(fn func(table *SysTable) string, tables ...*SysTable) *bytes.Buffer {
 	buffer := bytes.NewBuffer(nil)
 	for _, table := range tables {
@@ -270,7 +330,7 @@ func bufferTable(fn func(table *SysTable) string, tables ...*SysTable) *bytes.Bu
 	return buffer
 }
 
-func buildWire(pkg string, tables []*SysTable) *Wires {
+func buildWire(pkg string, tables []*SysTable) *TemplateData {
 	fn := func(table *SysTable) string {
 		tmp := fmt.Sprintf("\n\tNew%s,", table.pascal())
 		comment := table.comment()
@@ -281,9 +341,9 @@ func buildWire(pkg string, tables []*SysTable) *Wires {
 	}
 	buffer := bufferTable(fn, tables...)
 	buffer.WriteString("\n")
-	return &Wires{
-		DefinePackageName: pkg,
-		WireContent:       buffer.String(),
+	return &TemplateData{
+		WireDefinePackageName: pkg,
+		WireContent:           buffer.String(),
 	}
 }
 
@@ -293,7 +353,7 @@ func (s *Param) createModel() error {
 	buf := bytes.NewBuffer(nil)
 	pkg := "model"
 	data := buildWire(pkg, s.caller.Tables())
-	data.Version = s.Version
+	data.TemplateVersion = s.Version
 	if err := temp.Execute(buf, data); err != nil {
 		return err
 	}
@@ -305,24 +365,44 @@ func (s *Param) createModelSchema() error {
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
 	buf := bytes.NewBuffer(nil)
+	ddl := bytes.NewBuffer(nil)
 	for _, table := range s.caller.Tables() {
+		{
+			// for table ddl
+			create, err := s.caller.ShowCreateTable(table)
+			if err != nil {
+				return err
+			}
+			for strings.HasSuffix(create, "\n") {
+				create = strings.TrimSuffix(create, "\n")
+			}
+			ddl.WriteString(create)
+			if !strings.HasSuffix(create, ";") {
+				ddl.WriteString(";")
+			}
+			ddl.WriteString("\n")
+		}
 		data := s.createModelSchemaTable(table)
-		data.Version = s.Version
+		data.TemplateVersion = s.Version
 		if err := tmpModelSchemaContent.Execute(buf, data); err != nil {
 			return err
 		}
 	}
 
 	content := bytes.NewBuffer(nil)
-	data := &ModelSchemas{
-		Version: s.Version,
-		Content: buf.String(),
+	data := &TemplateData{
+		TemplateVersion:             s.Version,
+		ModelAllTablesSchemaContent: buf.String(),
 	}
 	if err := tmpModelSchema.Execute(content, data); err != nil {
 		return err
 	}
 
-	return CopyReaderToFile(content, pathJoin(s.OutputDirectory, "model", "model_schema.go"))
+	err := CopyReaderToFile(content, pathJoin(s.OutputDirectory, "model", "model_schema.go"))
+	if err != nil {
+		return err
+	}
+	return CopyReaderToFile(ddl, pathJoin(s.OutputDirectory, "model", "table_create.sql"))
 }
 
 // createData create data.go
@@ -331,7 +411,7 @@ func (s *Param) createData() (err error) {
 	buf := bytes.NewBuffer(nil)
 	pkg := "data"
 	data := buildWire(pkg, s.caller.Tables())
-	data.Version = s.Version
+	data.TemplateVersion = s.Version
 	if err = temp.Execute(buf, data); err != nil {
 		return
 	}
@@ -347,16 +427,16 @@ func (s *Param) createDataSchema() error {
 	buf := bytes.NewBuffer(nil)
 	for _, table := range s.caller.Tables() {
 		data := s.createDataSchemaTable(table)
-		data.Version = s.Version
+		data.TemplateVersion = s.Version
 		if err := tmpDataSchemaContent.Execute(buf, data); err != nil {
 			return err
 		}
 	}
 
 	outer := bytes.NewBuffer(nil)
-	data := &DataSchemas{
-		Version:                    s.Version,
-		ImportModelPackage:         s.ImportModelPackageName,
+	data := &TemplateData{
+		TemplateVersion:            s.Version,
+		DataImportModelPackageName: s.ImportModelPackageName,
 		DataAllTablesSchemaContent: buf.String(),
 	}
 	if err := tmpDataSchema.Execute(outer, data); err != nil {
@@ -366,11 +446,60 @@ func (s *Param) createDataSchema() error {
 	return CopyReaderToFile(outer, pathJoin(s.OutputDirectory, "data", "data_schema.go"))
 }
 
+// createBiz create biz.tmpl
+func (s *Param) createBiz() (err error) {
+	temp := NewTemplate("tmpl_wire", tmplWire)
+	buf := bytes.NewBuffer(nil)
+	pkg := "biz"
+	data := buildWire(pkg, s.caller.Tables())
+	data.TemplateVersion = s.Version
+	if err = temp.Execute(buf, data); err != nil {
+		return
+	}
+	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.tmpl", pkg)))
+	return
+}
+
+// createBizSchema create biz_schema.tmpl
+func (s *Param) createBizSchema() error {
+	tmpBizSchema := NewTemplate("biz_schema", tmplBizSchema)
+	tmpBizSchemaContent := NewTemplate("biz_schema_content", tmplBizSchemaContent)
+
+	buf := bytes.NewBuffer(nil)
+	for _, table := range s.caller.Tables() {
+		data := s.createBizSchemaTable(table)
+		data.TemplateVersion = s.Version
+		if err := tmpBizSchemaContent.Execute(buf, data); err != nil {
+			return err
+		}
+	}
+
+	outer := bytes.NewBuffer(nil)
+	data := &TemplateData{
+		TemplateVersion:           s.Version,
+		BizImportDataPackageName:  strings.Replace(s.ImportModelPackageName, "model", "data", 1),
+		BizAllTablesSchemaContent: buf.String(),
+	}
+	if err := tmpBizSchema.Execute(outer, data); err != nil {
+		return err
+	}
+
+	return CopyReaderToFile(outer, pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl"))
+}
+
 // BuildAll build all template
 func (s *Param) BuildAll() error {
 	err := s.initialize()
 	if err != nil {
 		return err
+	}
+	switch TypeDriver(s.Driver) {
+	case DriverMysql:
+	case DriverPostgres:
+		if _, err = s.way.DB().Exec(pgsqlFuncCreate); err != nil {
+			return err
+		}
+		defer func() { _, _ = s.way.DB().Exec(pgsqlFuncDrop) }()
 	}
 	// query
 	if err = s.caller.Queries(); err != nil {
@@ -390,37 +519,37 @@ func (s *Param) BuildAll() error {
 	if err = s.createDataSchema(); err != nil {
 		return err
 	}
+	// biz
+	if err = s.createBiz(); err != nil {
+		return err
+	}
+	if err = s.createBizSchema(); err != nil {
+		return err
+	}
 	return nil
 }
 
-type DataSchemas struct {
-	Version                    string // template version
-	ImportModelPackage         string
-	DataAllTablesSchemaContent string
-}
-
-type Wires struct {
-	Version           string // template version
-	DefinePackageName string // package name
-	WireContent       string // wire content
-}
-
-type ModelSchemas struct {
-	Version string // template version
-	Content string
-}
-
-type CreateDataSchemaTable struct {
-	Version         string // template version
-	TableNamePascal string // 表名(帕斯卡命名) ==> AccountMoneyLog
-	TableName       string // 表名(数据库原始命名) ==> account_money_log
-	TableNameSchema string // 表名(带数据库模式前缀名) ==> public.account_money_log
-	TableComment    string // 表注释 ==> 账户日志明细表
+// createBizSchemaTable create biz schema table
+func (s *Param) createBizSchemaTable(table *SysTable) (model *TemplateData) {
+	model = &TemplateData{
+		TableNamePascal: table.pascal(),
+		TableName:       *table.TableName,
+		TableNameSchema: "",
+		TableComment:    "",
+	}
+	if table.TableComment != nil {
+		model.TableComment = *table.TableComment
+	}
+	if table.TableSchema != nil {
+		model.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, model.TableName)
+	}
+	model.TableNameSmallPascal = strings.ToLower(model.TableNamePascal[0:1]) + model.TableNamePascal[1:]
+	return
 }
 
 // createDataSchemaTable create data schema table
-func (s *Param) createDataSchemaTable(table *SysTable) (model *CreateDataSchemaTable) {
-	model = &CreateDataSchemaTable{
+func (s *Param) createDataSchemaTable(table *SysTable) (model *TemplateData) {
+	model = &TemplateData{
 		TableNamePascal: table.pascal(),
 		TableName:       *table.TableName,
 		TableNameSchema: "",
@@ -435,32 +564,9 @@ func (s *Param) createDataSchemaTable(table *SysTable) (model *CreateDataSchemaT
 	return
 }
 
-type CreateModelSchemaTable struct {
-	Version             string // template version
-	TableNamePascal     string // 表名(帕斯卡命名) ==> AccountMoneyLog
-	TableName           string // 表名(数据库原始命名) ==> account_money_log
-	TableNameWithSchema string // 表名(带数据库模式前缀名) ==> public.account_money_log
-	TableComment        string // 表注释 ==> 账户日志明细表
-
-	TableStructColumn                   []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
-	TableStructColumnHey                []string // 表结构体字段关系定义 ==> Name string // name 名称
-	TableStructColumnHeyFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
-	TableStructColumnHeyFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
-	TableStructColumnReq                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
-
-	TableStructColumnHeyValues          []string // NewHey.Attribute ==> Name:"name", // 名称
-	TableStructColumnHeyValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
-	TableStructColumnHeyValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
-
-	TableColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
-	TableColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
-	TableColumnUpdatedAt string // 结构体字段方法 ColumnUpdatedAt
-	TableColumnDeletedAt string // 结构体字段方法 ColumnDeletedAt
-}
-
 // createModelSchemaTable create model schema table
-func (s *Param) createModelSchemaTable(table *SysTable) (model *CreateModelSchemaTable) {
-	model = &CreateModelSchemaTable{
+func (s *Param) createModelSchemaTable(table *SysTable) (model *TemplateData) {
+	model = &TemplateData{
 		TableNamePascal: table.pascal(),
 		TableName:       *table.TableName,
 	}
@@ -474,6 +580,8 @@ func (s *Param) createModelSchemaTable(table *SysTable) (model *CreateModelSchem
 			model.TableNameWithSchema = model.TableName
 		}
 	}
+
+	columnUpdates := make([]string, 0)
 
 	// struct define
 	for i, c := range table.Column {
@@ -491,7 +599,18 @@ func (s *Param) createModelSchemaTable(table *SysTable) (model *CreateModelSchem
 			tmp = fmt.Sprintf("\n%s", tmp)
 		}
 		model.TableStructColumn = append(model.TableStructColumn, tmp)
+
+		// update column
+		o := *c.ColumnName
+		p := c.pascal()
+		update := fmt.Sprintf(`
+	if s.%s != c.%s {
+		tmp["%s"] = c.%s
+	}`, p, p, o, p)
+		columnUpdates = append(columnUpdates, update)
 	}
+
+	model.TableStructColumnUpdate = strings.Join(columnUpdates, "")
 
 	// hey
 	for i, c := range table.Column {
@@ -581,7 +700,10 @@ func (s *Param) createModelSchemaTable(table *SysTable) (model *CreateModelSchem
 			}
 			return tmp
 		}
-		autoIncrement := fc(s.FieldsAutoIncrement)                  // auto increment column
+		autoIncrement := fc(s.FieldsAutoIncrement) // auto increment column
+		if table.TableAutoIncrement != "" && s.FieldsAutoIncrement != table.TableAutoIncrement {
+			autoIncrement = append(autoIncrement, table.TableAutoIncrement)
+		}
 		created := fc(strings.Split(s.FieldsListCreatedAt, ",")...) // created_at columns
 		updated := fc(strings.Split(s.FieldsListUpdatedAt, ",")...) // updated_at columns
 		deleted := fc(strings.Split(s.FieldsListDeletedAt, ",")...) // deleted_at columns
