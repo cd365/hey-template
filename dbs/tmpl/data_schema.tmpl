@@ -10,37 +10,31 @@ import (
 	"{{{.DataImportModelPackageName}}}"
 )
 
-type Faster interface {
-	W(way ...*hey.Way) *hey.Way
-    R(way ...*hey.Way) *hey.Way
-    F(filters ...hey.Filter) hey.Filter
-    Add(way ...*hey.Way) *hey.Add
-    Del(way ...*hey.Way) *hey.Del
-    Mod(way ...*hey.Way) *hey.Mod
-    Get(way ...*hey.Way) *hey.Get
-    Table() string
-    Field() []string
-    FieldMap() map[string]struct{}
-    FieldExist(field string) bool
-    CreatedAt() []string
-    UpdatedAt() []string
-    DeletedAt() []string
-    AddExcept() []string
-    ModExcept() []string
-    AddAt(add *hey.Add, way ...*hey.Way)
-    ModAt(mod *hey.Mod, way ...*hey.Way)
-    NotExistsIndex(fields []string) []int
-    // Insert the inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct
-    Insert(insert interface{}, way ...*hey.Way) (int64, error)
-    Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
-    // Update the object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct
-    Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error)
-    Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
-    SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
-    Count(filter hey.Filter) (int64, error)
+type HeyTables struct {
+    _map map[string]model.HeyFaster
+	{{{.DataMapListDefine}}}
 }
 
-func OptionWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
+func NewHeyTables(
+	{{{.DataMapListParams}}}
+) *HeyTables {
+	s := &HeyTables{
+		{{{.DataMapListAssign}}}
+	}
+	s._map = map[string]model.HeyFaster{
+        {{{.DataMapListStorage}}}
+    }
+    return s
+}
+
+func (s *HeyTables) Get(name string) model.HeyFaster {
+	if had, ok := s._map[name]; ok {
+		return had
+	}
+	return nil
+}
+
+func autoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
 	for i := len(options) - 1; i >= 0; i-- {
 		if options[i] != nil {
 			return options[i]

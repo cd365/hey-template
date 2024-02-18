@@ -201,6 +201,14 @@ func (s *SysTable) pascal() string {
 	return pascal(*s.TableName)
 }
 
+func (s *SysTable) pascalSmall() string {
+	name := s.pascal()
+	if len(name) == 0 {
+		return ""
+	}
+	return strings.ToLower(name[0:1]) + name[1:]
+}
+
 func (s *SysTable) comment() string {
 	if s.TableComment == nil {
 		return ""
@@ -287,6 +295,10 @@ type TemplateData struct {
 	// data
 	DataImportModelPackageName string // data.go data import model package name
 	DataAllTablesSchemaContent string // data.go data all tables schema content
+	DataMapListDefine          string // data_schema.go tables define
+	DataMapListParams          string // data_schema.go tables params
+	DataMapListAssign          string // data_schema.go tables assign
+	DataMapListStorage         string // data_schema.go tables storage
 
 	// wire
 	WireDefinePackageName string // wire.go define package name
@@ -322,17 +334,20 @@ type TemplateData struct {
 	TableDdl string // table ddl
 }
 
-func bufferTable(fn func(table *SysTable) string, tables ...*SysTable) *bytes.Buffer {
+func bufferTable(fn func(i int, table *SysTable) string, tables ...*SysTable) *bytes.Buffer {
 	buffer := bytes.NewBuffer(nil)
-	for _, table := range tables {
-		buffer.WriteString(fn(table))
+	for index, table := range tables {
+		buffer.WriteString(fn(index, table))
 	}
 	return buffer
 }
 
 func buildWire(pkg string, tables []*SysTable) *TemplateData {
-	fn := func(table *SysTable) string {
-		tmp := fmt.Sprintf("\n\tNew%s,", table.pascal())
+	fn := func(i int, table *SysTable) string {
+		tmp := fmt.Sprintf("New%s,", table.pascal())
+		if i > 0 {
+			tmp = fmt.Sprintf("\n\t%s", tmp)
+		}
 		comment := table.comment()
 		if comment != "" {
 			tmp = fmt.Sprintf("%s // %s", tmp, comment)
@@ -340,7 +355,9 @@ func buildWire(pkg string, tables []*SysTable) *TemplateData {
 		return tmp
 	}
 	buffer := bufferTable(fn, tables...)
-	buffer.WriteString("\n")
+	if pkg == "data" {
+		buffer.WriteString(fmt.Sprintf("\n\tNewHeyTables, // all instances"))
+	}
 	return &TemplateData{
 		WireDefinePackageName: pkg,
 		WireContent:           buffer.String(),
@@ -425,7 +442,8 @@ func (s *Param) createDataSchema() error {
 	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
 
 	buf := bytes.NewBuffer(nil)
-	for _, table := range s.caller.Tables() {
+	tables := s.caller.Tables()
+	for _, table := range tables {
 		data := s.createDataSchemaTable(table)
 		data.TemplateVersion = s.Version
 		if err := tmpDataSchemaContent.Execute(buf, data); err != nil {
@@ -439,6 +457,23 @@ func (s *Param) createDataSchema() error {
 		DataImportModelPackageName: s.ImportModelPackageName,
 		DataAllTablesSchemaContent: buf.String(),
 	}
+	length := len(tables)
+	defines := make([]string, 0, length)
+	params := make([]string, 0, length)
+	assigns := make([]string, 0, length)
+	storage := make([]string, 0, length)
+	for _, table := range tables {
+		namePascal := table.pascal()
+		namePascalSmall := table.pascalSmall()
+		defines = append(defines, fmt.Sprintf("%s *%s", namePascalSmall, namePascal))
+		params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
+		assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascalSmall, namePascalSmall))
+		storage = append(storage, fmt.Sprintf("%s.Table(): %s,", namePascalSmall, namePascalSmall))
+	}
+	data.DataMapListDefine = strings.Join(defines, "\n\t")
+	data.DataMapListParams = strings.Join(params, "\n\t")
+	data.DataMapListAssign = strings.Join(assigns, "\n\t\t")
+	data.DataMapListStorage = strings.Join(storage, "\n\t\t")
 	if err := tmpDataSchema.Execute(outer, data); err != nil {
 		return err
 	}

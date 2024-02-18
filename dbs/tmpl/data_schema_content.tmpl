@@ -20,11 +20,11 @@ func (s *{{{.TableNamePascal}}}) T() *model.Hey{{{.TableNamePascal}}} {
 }
 
 func (s *{{{.TableNamePascal}}}) W(way ...*hey.Way) *hey.Way {
-	return OptionWay(s.way.W(), way...)
+	return autoWay(s.way.W(), way...)
 }
 
 func (s *{{{.TableNamePascal}}}) R(way ...*hey.Way) *hey.Way {
-	return OptionWay(s.way.R(), way...)
+	return autoWay(s.way.R(), way...)
 }
 
 func (s *{{{.TableNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
@@ -167,6 +167,14 @@ func (s *{{{.TableNamePascal}}}) SelectGet(get func(get *hey.Get), result interf
 	tmp := s.Get(way...)
 	get(tmp)
 	return tmp.Get(result)
+}
+
+func (s *{{{.TableNamePascal}}}) SelectGetAll(query func(get *hey.Get), way ...*hey.Way) (interface{}, error) {
+	return s.ThisGetAll(query, way...)
+}
+
+func (s *{{{.TableNamePascal}}}) SelectGetOne(query func(get *hey.Get), way ...*hey.Way) (interface{}, error) {
+	return s.ThisGetOne(query, way...)
 }
 
 func (s *{{{.TableNamePascal}}}) Count(filter hey.Filter) (int64, error) {
