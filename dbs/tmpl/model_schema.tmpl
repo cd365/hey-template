@@ -27,7 +27,7 @@ const (
 	SwitchOff = "OFF"
 )
 
-type HeyFaster interface {
+type Table interface {
 	W(way ...*hey.Way) *hey.Way
     R(way ...*hey.Way) *hey.Way
     F(filters ...hey.Filter) hey.Filter
@@ -59,19 +59,19 @@ type HeyFaster interface {
     Count(filter hey.Filter) (int64, error)
 }
 
-// HeyCompareUpdateByUniqueFilter compare and update one row by unique key filter(only using equal)
-func HeyCompareUpdateByUniqueFilter(faster HeyFaster, uniqueEqualFilter hey.Filter, origin interface{}, latest interface{}, way ...*hey.Way) (int64, error) {
-	if faster == nil || uniqueEqualFilter == nil {
+// TableCompareUpdateByUniqueFilter compare and update one row by unique key filter(only using equal)
+func TableCompareUpdateByUniqueFilter(table Table, uniqueEqualFilter hey.Filter, origin interface{}, latest interface{}, way ...*hey.Way) (int64, error) {
+	if table == nil || uniqueEqualFilter == nil {
 		return 0, nil
 	}
 	if origin == nil && latest != nil {
-		tmp, err := faster.SelectGetOne(func(get *hey.Get) { get.Where(uniqueEqualFilter) }, way...)
+		tmp, err := table.SelectGetOne(func(get *hey.Get) { get.Where(uniqueEqualFilter) }, way...)
 		if err != nil {
 			return 0, err
 		}
 		origin = tmp
 	}
-	fields, values := hey.StructUpdate(origin, latest, faster.W(way...).Tag())
+	fields, values := hey.StructUpdate(origin, latest, table.W(way...).Tag())
 	modify := make(map[string]interface{})
 	for k, v := range fields {
 		modify[v] = values[k]
@@ -79,14 +79,14 @@ func HeyCompareUpdateByUniqueFilter(faster HeyFaster, uniqueEqualFilter hey.Filt
 	if len(modify) == 0 {
 		return 0, nil
 	}
-	return faster.Update(uniqueEqualFilter, modify, way...)
+	return table.Update(uniqueEqualFilter, modify, way...)
 }
 
-// HeyPseudoDelete pseudo delete by filter
-func HeyPseudoDelete(faster HeyFaster, filter hey.Filter, pseudo map[string]interface{}, way ...*hey.Way) (int64, error) {
-    if faster == nil || filter == nil || pseudo == nil {
+// TablePseudoDelete pseudo delete by filter
+func TablePseudoDelete(table Table, filter hey.Filter, pseudo map[string]interface{}, way ...*hey.Way) (int64, error) {
+    if table == nil || filter == nil || pseudo == nil {
         return 0, nil
     }
-	return faster.Update(filter, pseudo, way...)
+	return table.Update(filter, pseudo, way...)
 }
 {{{.ModelAllTablesSchemaContent}}}

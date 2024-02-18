@@ -299,6 +299,7 @@ type TemplateData struct {
 	DataMapListParams          string // data_schema.go tables params
 	DataMapListAssign          string // data_schema.go tables assign
 	DataMapListStorage         string // data_schema.go tables storage
+	DataMapListSlice           string // data_schema.go tables slice
 
 	// wire
 	WireDefinePackageName string // wire.go define package name
@@ -356,7 +357,7 @@ func buildWire(pkg string, tables []*SysTable) *TemplateData {
 	}
 	buffer := bufferTable(fn, tables...)
 	if pkg == "data" {
-		buffer.WriteString(fmt.Sprintf("\n\tNewHeyTables, // all instances"))
+		buffer.WriteString(fmt.Sprintf("\n\tNewTables, // all instances"))
 	}
 	return &TemplateData{
 		WireDefinePackageName: pkg,
@@ -462,18 +463,21 @@ func (s *Param) createDataSchema() error {
 	params := make([]string, 0, length)
 	assigns := make([]string, 0, length)
 	storage := make([]string, 0, length)
+	slice := make([]string, 0, length)
 	for _, table := range tables {
 		namePascal := table.pascal()
 		namePascalSmall := table.pascalSmall()
-		defines = append(defines, fmt.Sprintf("%s *%s", namePascalSmall, namePascal))
+		defines = append(defines, fmt.Sprintf("%s *%s", namePascal, namePascal))
 		params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
-		assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascalSmall, namePascalSmall))
+		assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascal, namePascalSmall))
 		storage = append(storage, fmt.Sprintf("%s.Table(): %s,", namePascalSmall, namePascalSmall))
+		slice = append(slice, fmt.Sprintf("%s.Table(),", namePascalSmall))
 	}
 	data.DataMapListDefine = strings.Join(defines, "\n\t")
 	data.DataMapListParams = strings.Join(params, "\n\t")
 	data.DataMapListAssign = strings.Join(assigns, "\n\t\t")
 	data.DataMapListStorage = strings.Join(storage, "\n\t\t")
+	data.DataMapListSlice = strings.Join(slice, "\n\t\t")
 	if err := tmpDataSchema.Execute(outer, data); err != nil {
 		return err
 	}

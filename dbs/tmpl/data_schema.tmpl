@@ -10,28 +10,41 @@ import (
 	"{{{.DataImportModelPackageName}}}"
 )
 
-type HeyTables struct {
-    _map map[string]model.HeyFaster
+type Tables struct {
+    tableMap map[string]model.Table
+    tableSlice []string
 	{{{.DataMapListDefine}}}
 }
 
-func NewHeyTables(
-	{{{.DataMapListParams}}}
-) *HeyTables {
-	s := &HeyTables{
-		{{{.DataMapListAssign}}}
+func (s *Tables) HeyMap() map[string]model.Table {
+	length := len(s.tableMap)
+	result := make(map[string]model.Table, length)
+	for k, v := range s.tableMap {
+		result[k] = v
 	}
-	s._map = map[string]model.HeyFaster{
-        {{{.DataMapListStorage}}}
-    }
-    return s
+	return result
 }
 
-func (s *HeyTables) Get(name string) model.HeyFaster {
-	if had, ok := s._map[name]; ok {
-		return had
+func (s *Tables) HeySlice() []string {
+	length := len(s.tableSlice)
+	result := make([]string, length)
+	copy(result, s.tableSlice)
+	return result
+}
+
+func NewTables(
+	{{{.DataMapListParams}}}
+) *Tables {
+	s := &Tables{
+		{{{.DataMapListAssign}}}
 	}
-	return nil
+	s.tableMap = map[string]model.Table{
+        {{{.DataMapListStorage}}}
+    }
+    s.tableSlice = []string{
+        {{{.DataMapListSlice}}}
+    }
+    return s
 }
 
 func autoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
