@@ -150,7 +150,13 @@ var pgSeq = regexp.MustCompile(`^nextval\('([A-Za-z0-9_]+)'::regclass\)$`)
 func (s *Pgsql) ShowCreateTable(table *SysTable) (string, error) {
 	var createSequence string
 	for _, c := range table.Column {
-		if c.ColumnDefault != nil && pgSeq.MatchString(*c.ColumnDefault) {
+		if c.ColumnDefault == nil {
+			continue
+		}
+		if strings.Contains(*c.ColumnDefault, "\"") {
+			*c.ColumnDefault = strings.ReplaceAll(*c.ColumnDefault, "\"", "")
+		}
+		if pgSeq.MatchString(*c.ColumnDefault) {
 			result := pgSeq.FindAllStringSubmatch(*c.ColumnDefault, -1)
 			if len(result) == 1 && len(result[0]) == 2 && result[0][1] != "" {
 				createSequence = fmt.Sprintf("CREATE SEQUENCE IF NOT EXISTS %s START 1;\n", result[0][1])
