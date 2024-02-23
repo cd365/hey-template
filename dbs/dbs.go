@@ -47,6 +47,8 @@ type Param struct {
 	DataSourceName          string   // data source name
 	DatabaseSchemaName      string   // 数据库模式名称
 	ImportModelPackageName  string   // model包全名
+	BizCommon               bool     // biz common.go
+	BizCommonContent        string   // biz common.go table1.field1,table2.field2,table3.field3...
 	UsingDatabaseSchemaName bool     // 是否在表名之前使用模式前缀名称 mysql:数据库名 pgsql:模式名
 	FieldsAutoIncrement     string   // 表自动递增字段
 	FieldsListCreatedAt     string   // 创建时间戳字段列表, 多个","隔开
@@ -79,6 +81,12 @@ var (
 
 	//go:embed tmpl/biz_schema_content.tmpl
 	tmplBizSchemaContent []byte
+
+	//go:embed tmpl/biz_common.tmpl
+	tmplBizCommon []byte
+
+	//go:embed tmpl/biz_common_content.tmpl
+	tmplBizCommonContent []byte
 
 	//go:embed pgsql_func_create.sql
 	pgsqlFuncCreate string
@@ -386,6 +394,7 @@ func (s *Param) createModelSchema() error {
 	ddl := bytes.NewBuffer(nil)
 	for _, table := range s.caller.Tables() {
 		{
+
 			// for table ddl
 			create, err := s.caller.ShowCreateTable(table)
 			if err != nil {
@@ -526,6 +535,88 @@ func (s *Param) createBizSchema() error {
 	return CopyReaderToFile(outer, pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl"))
 }
 
+type BizCommon struct {
+	// version
+	TemplateVersion string // template version
+
+	ModuleImportPrefix string // import prefix
+
+	MethodsContent string // all table methods content
+}
+
+type BizCommonContent struct {
+	TableNamePascal                   string
+	TableAutoIncrementFieldName       string
+	TableAutoIncrementFieldNamePascal string
+}
+
+// createBizCommon create biz/common.go
+func (s *Param) createBizCommon() (err error) {
+	if !s.BizCommon {
+		return
+	}
+	temp := NewTemplate("tmpl_biz_common", tmplBizCommon)
+	buf := bytes.NewBuffer(nil)
+	pkg := "biz"
+	data := &BizCommon{}
+	data.TemplateVersion = s.Version
+	data.ModuleImportPrefix = strings.TrimSuffix(s.ImportModelPackageName, "model")
+
+	{
+		bcs := strings.Split(s.BizCommonContent, ",")
+		bcsMapSlice := make(map[string][]string)
+		for _, v := range bcs {
+			v = strings.TrimSpace(strings.ReplaceAll(v, " ", ""))
+			vv := strings.Split(v, ".")
+			if len(vv) != 2 {
+				continue
+			}
+			if _, ok := bcsMapSlice[vv[0]]; !ok {
+				bcsMapSlice[vv[0]] = make([]string, 0, 1)
+			}
+			bcsMapSlice[vv[0]] = append(bcsMapSlice[vv[0]], vv[1])
+		}
+
+		content := bytes.NewBuffer(nil)
+		writeContentMethod := func(table string, field string) error {
+			bcc := &BizCommonContent{
+				TableNamePascal:                   pascal(table),
+				TableAutoIncrementFieldNamePascal: pascal(field),
+			}
+			bccTmpl := NewTemplate("tmpl_biz_common_content", tmplBizCommonContent)
+			return bccTmpl.Execute(content, bcc)
+		}
+		for _, table := range s.caller.Tables() {
+			if table.TableAutoIncrement != "" {
+				if err = writeContentMethod(*table.TableName, table.TableAutoIncrement); err != nil {
+					return
+				}
+			}
+			fieldsExists := make(map[string]struct{})
+			for _, v := range table.Column {
+				fieldsExists[*v.ColumnName] = struct{}{}
+			}
+			if fields, ok := bcsMapSlice[*table.TableName]; ok {
+				for _, f := range fields {
+					if _, ok = fieldsExists[f]; !ok {
+						continue
+					}
+					if err = writeContentMethod(*table.TableName, f); err != nil {
+						return
+					}
+				}
+			}
+		}
+		data.MethodsContent = content.String()
+	}
+
+	if err = temp.Execute(buf, data); err != nil {
+		return
+	}
+	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, "common.go"))
+	return
+}
+
 // BuildAll build all template
 func (s *Param) BuildAll() error {
 	err := s.initialize()
@@ -563,6 +654,9 @@ func (s *Param) BuildAll() error {
 		return err
 	}
 	if err = s.createBizSchema(); err != nil {
+		return err
+	}
+	if err = s.createBizCommon(); err != nil {
 		return err
 	}
 	return nil

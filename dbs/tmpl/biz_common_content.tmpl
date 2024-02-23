@@ -1,0 +1,10 @@
+
+func (s *Common) AddMod{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, addMod interface{}, way ...*hey.Way) (int64, error) {
+	m := s.db.{{{.TableNamePascal}}}
+	return s.AddMod(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, addMod, way...)
+}
+
+func (s *Common) Remove{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, way ...*hey.Way) (int64, error) {
+	m := s.db.{{{.TableNamePascal}}}
+	return s.Remove(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, way...)
+}
