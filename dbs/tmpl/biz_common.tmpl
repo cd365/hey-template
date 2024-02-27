@@ -3,12 +3,9 @@ package biz
 import (
 	"fmt"
 	"github.com/cd365/hey"
-	"github.com/google/wire"
 	"{{{.ModuleImportPrefix}}}data"
     "{{{.ModuleImportPrefix}}}model"
 )
-
-var ProviderCommon = wire.NewSet(NewCommon)
 
 type Common struct {
 	db  *data.Tables
