@@ -5,11 +5,11 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 	"unsafe"
 
 	"github.com/google/wire"
@@ -109,6 +109,10 @@ func (s *Param) initialize() error {
 	if err != nil {
 		return err
 	}
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxIdleTime(time.Minute * 3)
+	db.SetConnMaxLifetime(time.Minute * 3)
 	switch s.TypeDriver() {
 	case DriverMysql:
 		s.Discern = "`"
@@ -168,28 +172,19 @@ func pathJoin(items ...string) string {
 	return filepath.Join(items...)
 }
 
-// CopyReaderToFile copy io.Reader to file
-func CopyReaderToFile(writer io.Reader, filename string) error {
+func createFile(filename string) (*os.File, error) {
 	dir := filepath.Dir(filename)
 	if _, err := os.Stat(dir); err != nil {
 		if err = os.MkdirAll(dir, 0755); err != nil {
-			return err
+			return nil, err
 		}
 	}
 	if _, err := os.Stat(filename); err == nil {
 		if err = os.Remove(filename); err != nil {
-			return err
+			return nil, err
 		}
 	}
-	fil, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = fil.Close() }()
-	if _, err = io.Copy(fil, writer); err != nil {
-		return err
-	}
-	return nil
+	return os.Create(filename)
 }
 
 // SysTable 数据库表结构
@@ -374,98 +369,153 @@ func buildWire(pkg string, tables []*SysTable) *TemplateData {
 }
 
 // createModel create model.go
-func (s *Param) createModel() error {
+func (s *Param) createModel() (err error) {
 	temp := NewTemplate("tmpl_wire", tmplWire)
-	buf := bytes.NewBuffer(nil)
 	pkg := "model"
+	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
+		return
+	}
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
 	data := buildWire(pkg, s.caller.Tables())
 	data.TemplateVersion = s.Version
-	if err := temp.Execute(buf, data); err != nil {
-		return err
+	if err = temp.Execute(fil, data); err != nil {
+		return
 	}
-	return CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg)))
+	return
 }
 
 // createModelSchema create model_schema.go
-func (s *Param) createModelSchema() error {
+func (s *Param) createModelSchema() (err error) {
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
-	buf := bytes.NewBuffer(nil)
-	ddl := bytes.NewBuffer(nil)
+
+	modelSchemaFilename := pathJoin(s.OutputDirectory, "model", "model_schema.go")
+	var modelSchemaContent *os.File
+	if modelSchemaContent, err = createFile(modelSchemaFilename); err != nil {
+		return
+	}
+	defer func() {
+		_ = modelSchemaContent.Close()
+		if err != nil {
+			_ = os.Remove(modelSchemaFilename)
+		}
+	}()
+
+	modelSchemaContentBuffer := bytes.NewBuffer(nil)
+
+	modelTableCreateFilename := pathJoin(s.OutputDirectory, "model", "table_create.sql")
+	var modelTableCreateContent *os.File
+	if modelTableCreateContent, err = createFile(modelTableCreateFilename); err != nil {
+		return
+	}
+	defer func() {
+		_ = modelTableCreateContent.Close()
+		if err != nil {
+			_ = os.Remove(modelTableCreateFilename)
+		}
+	}()
+
+	create := ""
 	for _, table := range s.caller.Tables() {
 		{
 
 			// for table ddl
-			create, err := s.caller.ShowCreateTable(table)
+			create, err = s.caller.ShowCreateTable(table)
 			if err != nil {
-				return err
+				return
 			}
 			for strings.HasSuffix(create, "\n") {
 				create = strings.TrimSuffix(create, "\n")
 			}
-			ddl.WriteString(create)
-			if !strings.HasSuffix(create, ";") {
-				ddl.WriteString(";")
+			if _, err = modelTableCreateContent.WriteString(create); err != nil {
+				return
 			}
-			ddl.WriteString("\n")
+			if !strings.HasSuffix(create, ";") {
+				if _, err = modelTableCreateContent.WriteString(";"); err != nil {
+					return
+				}
+			}
+			if _, err = modelTableCreateContent.WriteString("\n"); err != nil {
+				return
+			}
 		}
 		data := s.createModelSchemaTable(table)
 		data.TemplateVersion = s.Version
-		if err := tmpModelSchemaContent.Execute(buf, data); err != nil {
-			return err
+		if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, data); err != nil {
+			return
 		}
 	}
 
-	content := bytes.NewBuffer(nil)
 	data := &TemplateData{
 		TemplateVersion:             s.Version,
-		ModelAllTablesSchemaContent: buf.String(),
+		ModelAllTablesSchemaContent: modelSchemaContentBuffer.String(),
 	}
-	if err := tmpModelSchema.Execute(content, data); err != nil {
-		return err
+	if err = tmpModelSchema.Execute(modelSchemaContent, data); err != nil {
+		return
 	}
-
-	err := CopyReaderToFile(content, pathJoin(s.OutputDirectory, "model", "model_schema.go"))
-	if err != nil {
-		return err
-	}
-	return CopyReaderToFile(ddl, pathJoin(s.OutputDirectory, "model", "table_create.sql"))
+	return
 }
 
 // createData create data.go
 func (s *Param) createData() (err error) {
 	temp := NewTemplate("tmpl_wire", tmplWire)
-	buf := bytes.NewBuffer(nil)
 	pkg := "data"
-	data := buildWire(pkg, s.caller.Tables())
-	data.TemplateVersion = s.Version
-	if err = temp.Execute(buf, data); err != nil {
+	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
 		return
 	}
-	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg)))
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
+	data := buildWire(pkg, s.caller.Tables())
+	data.TemplateVersion = s.Version
+	if err = temp.Execute(fil, data); err != nil {
+		return
+	}
 	return
 }
 
 // createDataSchema create data_schema.go
-func (s *Param) createDataSchema() error {
+func (s *Param) createDataSchema() (err error) {
 	tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
 	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
 
-	buf := bytes.NewBuffer(nil)
+	contents := bytes.NewBuffer(nil)
 	tables := s.caller.Tables()
 	for _, table := range tables {
 		data := s.createDataSchemaTable(table)
 		data.TemplateVersion = s.Version
-		if err := tmpDataSchemaContent.Execute(buf, data); err != nil {
+		if err = tmpDataSchemaContent.Execute(contents, data); err != nil {
 			return err
 		}
 	}
 
-	outer := bytes.NewBuffer(nil)
+	filename := pathJoin(s.OutputDirectory, "data", "data_schema.go")
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
+		return
+	}
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
 	data := &TemplateData{
 		TemplateVersion:            s.Version,
 		DataImportModelPackageName: s.ImportModelPackageName,
-		DataAllTablesSchemaContent: buf.String(),
+		DataAllTablesSchemaContent: contents.String(),
 	}
 	length := len(tables)
 	defines := make([]string, 0, length)
@@ -487,52 +537,70 @@ func (s *Param) createDataSchema() error {
 	data.DataMapListAssign = strings.Join(assigns, "\n\t\t")
 	data.DataMapListStorage = strings.Join(storage, "\n\t\t")
 	data.DataMapListSlice = strings.Join(slice, "\n\t\t")
-	if err := tmpDataSchema.Execute(outer, data); err != nil {
-		return err
+	if err = tmpDataSchema.Execute(fil, data); err != nil {
+		return
 	}
-
-	return CopyReaderToFile(outer, pathJoin(s.OutputDirectory, "data", "data_schema.go"))
+	return
 }
 
 // createBiz create biz.tmpl
 func (s *Param) createBiz() (err error) {
 	temp := NewTemplate("tmpl_wire", tmplWire)
-	buf := bytes.NewBuffer(nil)
 	pkg := "biz"
-	data := buildWire(pkg, s.caller.Tables())
-	data.TemplateVersion = s.Version
-	if err = temp.Execute(buf, data); err != nil {
+	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.tmpl", pkg))
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
 		return
 	}
-	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.tmpl", pkg)))
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
+	data := buildWire(pkg, s.caller.Tables())
+	data.TemplateVersion = s.Version
+	if err = temp.Execute(fil, data); err != nil {
+		return
+	}
 	return
 }
 
 // createBizSchema create biz_schema.tmpl
-func (s *Param) createBizSchema() error {
+func (s *Param) createBizSchema() (err error) {
 	tmpBizSchema := NewTemplate("biz_schema", tmplBizSchema)
 	tmpBizSchemaContent := NewTemplate("biz_schema_content", tmplBizSchemaContent)
 
 	buf := bytes.NewBuffer(nil)
+
 	for _, table := range s.caller.Tables() {
 		data := s.createBizSchemaTable(table)
 		data.TemplateVersion = s.Version
-		if err := tmpBizSchemaContent.Execute(buf, data); err != nil {
+		if err = tmpBizSchemaContent.Execute(buf, data); err != nil {
 			return err
 		}
 	}
 
-	outer := bytes.NewBuffer(nil)
+	filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl")
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
+		return
+	}
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
 	data := &TemplateData{
 		TemplateVersion:           s.Version,
 		BizImportDataPackageName:  strings.Replace(s.ImportModelPackageName, "model", "data", 1),
 		BizAllTablesSchemaContent: buf.String(),
 	}
-	if err := tmpBizSchema.Execute(outer, data); err != nil {
+	if err = tmpBizSchema.Execute(fil, data); err != nil {
 		return err
 	}
-
-	return CopyReaderToFile(outer, pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl"))
+	return
 }
 
 type BizCommon struct {
@@ -556,8 +624,21 @@ func (s *Param) createBizCommon() (err error) {
 		return
 	}
 	temp := NewTemplate("tmpl_biz_common", tmplBizCommon)
-	buf := bytes.NewBuffer(nil)
+
 	pkg := "biz"
+
+	filename := pathJoin(s.OutputDirectory, pkg, "common.go")
+	var fil *os.File
+	if fil, err = createFile(filename); err != nil {
+		return
+	}
+	defer func() {
+		_ = fil.Close()
+		if err != nil {
+			_ = os.Remove(filename)
+		}
+	}()
+
 	data := &BizCommon{}
 	data.TemplateVersion = s.Version
 	data.ModuleImportPrefix = strings.TrimSuffix(s.ImportModelPackageName, "model")
@@ -610,10 +691,9 @@ func (s *Param) createBizCommon() (err error) {
 		data.MethodsContent = content.String()
 	}
 
-	if err = temp.Execute(buf, data); err != nil {
+	if err = temp.Execute(fil, data); err != nil {
 		return
 	}
-	err = CopyReaderToFile(buf, pathJoin(s.OutputDirectory, pkg, "common.go"))
 	return
 }
 
