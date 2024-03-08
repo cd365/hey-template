@@ -1,3 +1,14 @@
+// hey-template version: {{{.Version}}}
+
+package data
+
+import (
+    "database/sql"
+
+	"github.com/cd365/hey"
+
+	"{{{.DataImportModelPackageName}}}"
+)
 
 type {{{.TableNamePascal}}} struct {
 	tab *model.Hey{{{.TableNamePascal}}}
@@ -113,7 +124,7 @@ func (s *{{{.TableNamePascal}}}) NotExistsIndex(fields []string) []int {
 }
 
 func (s *{{{.TableNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
-	return s.ThisInsert(func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}) {
+	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}) {
         if mp, ok := insert.(map[string]interface{}); ok {
             for k, v := range mp {
                 if s.FieldExist(k) {
@@ -139,7 +150,7 @@ func (s *{{{.TableNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int
 }
 
 func (s *{{{.TableNamePascal}}}) Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error) {
-	return s.ThisUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
+	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
 		mod.Where(s.F().Filter(filter))
 		tmp, ok := update.(map[string]interface{})
 		if !ok {
@@ -170,49 +181,49 @@ func (s *{{{.TableNamePascal}}}) SelectGet(get func(get *hey.Get), result interf
 }
 
 func (s *{{{.TableNamePascal}}}) SelectGetAll(query func(get *hey.Get), way ...*hey.Way) (interface{}, error) {
-	return s.ThisGetAll(query, way...)
+	return s.SelfGetAll(query, way...)
 }
 
 func (s *{{{.TableNamePascal}}}) SelectGetOne(query func(get *hey.Get), way ...*hey.Way) (interface{}, error) {
-	return s.ThisGetOne(query, way...)
+	return s.SelfGetOne(query, way...)
 }
 
 func (s *{{{.TableNamePascal}}}) Count(filter hey.Filter) (int64, error) {
-	return s.Get().SubQueryGet(s.ThisSubGet(func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}}) {
+	return s.Get().SubQueryGet(s.SelfSubGet(func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}}) {
 		get.Where(s.F(filter))
 	}), s.R().Identifier(model.TableAliasA).V()).Count()
 }
 
-func (s *{{{.TableNamePascal}}}) ThisInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.TableNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Add(way...).Except(s.AddExcept()...)
 	fc(tmp, s.tab)
 	s.AddAt(tmp, way...)
 	return tmp.Add()
 }
 
-func (s *{{{.TableNamePascal}}}) ThisDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.TableNamePascal}}}) SelfDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Del(way...)
 	w := s.F()
     fc(w, s.tab)
 	return tmp.Where(w).Del()
 }
 
-func (s *{{{.TableNamePascal}}}) ThisUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.TableNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Mod(way...).Except(s.ModExcept()...)
 	fc(tmp, s.tab)
     s.ModAt(tmp, way...)
 	return tmp.Mod()
 }
 
-func (s *{{{.TableNamePascal}}}) ThisGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.TableNamePascal}}}, err error) {
+func (s *{{{.TableNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.TableNamePascal}}}, err error) {
 	tmp := s.Get(way...)
 	query(tmp)
 	err = tmp.Get(&result)
 	return
 }
 
-func (s *{{{.TableNamePascal}}}) ThisGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.TableNamePascal}}}, error) {
-	tmp, err := s.ThisGetAll(func(get *hey.Get) {
+func (s *{{{.TableNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.TableNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(func(get *hey.Get) {
 		query(get)
 		get.Limit(1)
 	}, way...)
@@ -225,10 +236,65 @@ func (s *{{{.TableNamePascal}}}) ThisGetOne(query func(get *hey.Get), way ...*he
 	return nil, nil
 }
 
-func (s *{{{.TableNamePascal}}}) ThisSubGet(query func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}})) *hey.Get {
+func (s *{{{.TableNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.Hey{{{.TableNamePascal}}})) *hey.Get {
 	get := s.Get()
 	if query != nil {
 		query(get, s.tab)
 	}
 	return get
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustInsert(fc func(add *hey.Add, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) error {
+	rowsAffected, err := s.SelfInsert(fc, way...)
+	if err != nil {
+		return err
+	}
+	if rowsAffected <= 0 {
+		return model.ErrNoAffectedRows
+	}
+	return nil
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustDelete(fc func(w hey.Filter, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) error {
+	rowsAffected, err := s.SelfDelete(fc, way...)
+	if err != nil {
+		return err
+	}
+	if rowsAffected <= 0 {
+		return model.ErrNoAffectedRows
+	}
+	return nil
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}), way ...*hey.Way) error {
+	rowsAffected, err := s.SelfUpdate(fc, way...)
+	if err != nil {
+		return err
+	}
+	if rowsAffected <= 0 {
+		return model.ErrNoAffectedRows
+	}
+	return nil
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustGetAll(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.TableNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if len(tmp) == 0 {
+		return nil, model.ErrNotFound
+	}
+	return tmp, nil
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.TableNamePascal}}}, error) {
+	tmp, err := s.SelfGetOne(query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if tmp == nil {
+		return nil, model.ErrNotFound
+	}
+	return tmp, nil
 }

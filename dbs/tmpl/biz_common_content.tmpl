@@ -1,10 +1,20 @@
 
-func (s *Common) AddMod{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, addMod interface{}, way ...*hey.Way) (int64, error) {
+func (s *Common) Save{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, save interface{}, way ...*hey.Way) (int64, error) {
 	m := s.db.{{{.TableNamePascal}}}
-	return s.AddMod(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, addMod, way...)
+	return s.Save(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, save, way...)
 }
 
 func (s *Common) Remove{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, way ...*hey.Way) (int64, error) {
 	m := s.db.{{{.TableNamePascal}}}
 	return s.Remove(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, way...)
+}
+
+func (s *Common) MustSave{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, save interface{}, way ...*hey.Way) error {
+    m := s.db.{{{.TableNamePascal}}}
+	return s.MustSave(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, save, way...)
+}
+
+func (s *Common) MustRemove{{{.TableNamePascal}}}By{{{.TableAutoIncrementFieldNamePascal}}}(values{{{.TableAutoIncrementFieldNamePascal}}} interface{}, way ...*hey.Way) error {
+    m := s.db.{{{.TableNamePascal}}}
+	return s.MustRemove(m, m.T().{{{.TableAutoIncrementFieldNamePascal}}}, values{{{.TableAutoIncrementFieldNamePascal}}}, way...)
 }

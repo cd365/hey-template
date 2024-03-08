@@ -1,4 +1,4 @@
-// hey-template version: {{{.TemplateVersion}}}
+// hey-template version: {{{.Version}}}
 
 package biz
 
@@ -29,14 +29,14 @@ func (s *Common) F(filter ...hey.Filter) hey.Filter {
 	return s.way.R().F(filter...)
 }
 
-// AddMod 保存一条或者多条数据(filter:单个字段作为条件过滤; addMod: map[string]interface{}:指定字段更新, 结构体:所有字段更新)
-func (s *Common) AddMod(table model.Table, field string, values interface{}, addMod interface{}, way ...*hey.Way) (int64, error) {
+// Save 保存一条或者多条数据(filter:单个字段作为条件过滤; save: map[string]interface{}:指定字段更新, 结构体:所有字段更新)
+func (s *Common) Save(table model.Table, field string, values interface{}, save interface{}, way ...*hey.Way) (int64, error) {
 	if values == nil {
-		return table.Insert(addMod, way...) // 1 直接插入(单条|多条)
+		return table.Insert(save, way...) // 1 直接插入(单条|多条)
 	}
 	fvs := hey.SliceAny121(values)
 	filter := table.F().In(field, fvs...)
-	if tmp, ok := addMod.(map[string]interface{}); ok {
+	if tmp, ok := save.(map[string]interface{}); ok {
 		return table.Update(filter, tmp, way...) // 2 直接更新(单条|多条)
 	}
 	// 单条记录
@@ -48,13 +48,35 @@ func (s *Common) AddMod(table model.Table, field string, values interface{}, add
 		return 0, err
 	}
 	if had == nil {
-		return table.Insert(addMod, way...) // 单条插入
+		return table.Insert(save, way...) // 单条插入
 	}
-	return table.Update(filter, addMod, way...) // 单条更新
+	return table.Update(filter, save, way...) // 单条更新
 }
 
 // Remove 删除一条或者多条数据
 func (s *Common) Remove(table model.Table, field string, values interface{}, way ...*hey.Way) (int64, error) {
 	return table.Delete(table.F().In(field, values), way...)
+}
+
+func (s *Common) MustSave(table model.Table, field string, values interface{}, save interface{}, way ...*hey.Way) error {
+	rowsAffected, err := s.Save(table, field, values, save, way...)
+	if err != nil {
+		return err
+	}
+	if rowsAffected <= 0 {
+		return model.ErrNoAffectedRows
+	}
+	return nil
+}
+
+func (s *Common) MustRemove(table model.Table, field string, values interface{}, way ...*hey.Way) error {
+	rowsAffected, err := s.Remove(table, field, values, way...)
+	if err != nil {
+		return err
+	}
+	if rowsAffected <= 0 {
+		return model.ErrNoAffectedRows
+	}
+	return nil
 }
 {{{.MethodsContent}}}

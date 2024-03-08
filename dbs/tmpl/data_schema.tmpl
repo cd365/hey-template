@@ -1,10 +1,8 @@
-// hey-template version: {{{.TemplateVersion}}}
+// hey-template version: {{{.Version}}}
 
 package data
 
 import (
-    "database/sql"
-
 	"github.com/cd365/hey"
 
 	"{{{.DataImportModelPackageName}}}"
@@ -55,4 +53,3 @@ func autoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
 	}
 	return defaultWay
 }
-{{{.DataAllTablesSchemaContent}}}

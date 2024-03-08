@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	Version = "v0.0.4"
+	Version = "v0.0.5"
 )
 
 var param = &dbs.Param{

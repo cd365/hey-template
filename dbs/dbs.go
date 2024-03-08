@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -39,6 +40,10 @@ type Caller interface {
 	Queries() error
 	Tables() []*SysTable
 	ShowCreateTable(table *SysTable) (string, error)
+}
+
+type Writer interface {
+	Write() error
 }
 
 type Param struct {
@@ -95,9 +100,7 @@ var (
 	pgsqlFuncDrop string
 )
 
-var (
-	_ = wire.NewSet(wire.Value([]string(nil)))
-)
+var _ = wire.NewSet(wire.Value([]string(nil)))
 
 func (s *Param) TypeDriver() TypeDriver {
 	return TypeDriver(strings.ToLower(s.Driver))
@@ -143,6 +146,636 @@ func (s *Param) initialize() error {
 		err = fmt.Errorf("unsupported driver name: %s", s.Driver)
 	}
 	return nil
+}
+
+type Basis struct {
+	*Param
+	tables []*SysTable
+
+	// wire
+	WireDefinePackageName string // wire.go define package name
+	WireContent           string // wire.go content
+
+	// table
+	TableNamePascal      string // 表名(帕斯卡命名)
+	TableName            string // 数据库原始表名
+	TableNameSchema      string // 表模式名称或者数据库名称(表前缀名)
+	TableComment         string // 表注释
+	TableNameWithSchema  string // 表名(带前缀)
+	TableNameSmallPascal string // 表名(小帕斯卡命名)
+}
+
+func NewBasis(param *Param) *Basis {
+	basis := &Basis{Param: param}
+	basis.tables = param.caller.Tables()
+	return basis
+}
+
+func (s *Basis) buildWire(pkg string) {
+	fn := func(i int, table *SysTable) string {
+		tmp := fmt.Sprintf("New%s,", table.pascal())
+		if i > 0 {
+			tmp = fmt.Sprintf("\n\t%s", tmp)
+		}
+		comment := table.comment()
+		if comment != "" {
+			tmp = fmt.Sprintf("%s // %s", tmp, comment)
+		}
+		return tmp
+	}
+	buffer := bufferTable(fn, s.tables...)
+	if pkg == "data" {
+		buffer.WriteString(fmt.Sprintf("\n\tNewTables, // all instances"))
+	}
+	s.WireDefinePackageName = pkg
+	s.WireContent = buffer.String()
+}
+
+func (s *Basis) WriteFile(reader io.Reader, filename string) error {
+	fil, err := createFile(filename)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = fil.Close() }()
+	_, err = io.Copy(fil, reader)
+	return err
+}
+
+type DbModel struct {
+	*Basis
+
+	// model-content
+	TableStructColumn                   []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
+	TableStructColumnHey                []string // 表结构体字段关系定义 ==> Name string // name 名称
+	TableStructColumnHeyFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
+	TableStructColumnHeyFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
+	TableStructColumnReq                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
+	TableStructColumnUpdate             string   // 表结构体字段更新 ==> if s.Id != t.Id { tmp["id"] = t.Id }
+
+	TableStructColumnHeyValues          []string // NewHey.Attribute ==> Name:"name", // 名称
+	TableStructColumnHeyValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
+	TableStructColumnHeyValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
+
+	TableColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
+	TableColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
+	TableColumnUpdatedAt string // 结构体字段方法 ColumnUpdatedAt
+	TableColumnDeletedAt string // 结构体字段方法 ColumnDeletedAt
+
+	// model-ddl
+	TableDdl string // table ddl
+}
+
+func (s *DbModel) clean() {
+	s.TableStructColumn = nil
+	s.TableStructColumnHey = nil
+	s.TableStructColumnHeyFieldSlice = ""
+	s.TableStructColumnHeyFieldSliceValue = ""
+	s.TableStructColumnReq = nil
+	s.TableStructColumnUpdate = ""
+	s.TableStructColumnHeyValues = nil
+	s.TableStructColumnHeyValuesAccess = ""
+	s.TableStructColumnHeyValuesAccessMap = ""
+	s.TableColumnAutoIncr = ""
+	s.TableColumnCreatedAt = ""
+	s.TableColumnUpdatedAt = ""
+	s.TableColumnDeletedAt = ""
+	s.TableDdl = ""
+}
+
+func NewDbModel(basis *Basis) *DbModel {
+	return &DbModel{Basis: basis}
+}
+
+func (s *DbModel) createModelSchemaTable(table *SysTable) {
+	s.TableNamePascal = table.pascal()
+	s.TableName = *table.TableName
+	if table.TableComment != nil {
+		s.TableComment = *table.TableComment
+	}
+	if table.TableSchema != nil {
+		if s.UsingDatabaseSchemaName {
+			s.TableNameWithSchema = fmt.Sprintf("%s.%s", *table.TableSchema, s.TableName)
+		} else {
+			s.TableNameWithSchema = s.TableName
+		}
+	}
+
+	columnUpdates := make([]string, 0)
+
+	// struct define
+	for i, c := range table.Column {
+		tmp := fmt.Sprintf("\t%s %s `json:\"%s\" db:\"%s\"`",
+			c.pascal(),
+			c.databaseTypeToGoType(),
+			*c.ColumnName,
+			*c.ColumnName,
+		)
+		comment := c.comment()
+		if comment != "" {
+			tmp = fmt.Sprintf("%s // %s", tmp, comment)
+		}
+		if i != 0 {
+			tmp = fmt.Sprintf("\n%s", tmp)
+		}
+		s.TableStructColumn = append(s.TableStructColumn, tmp)
+
+		// update column
+		o := *c.ColumnName
+		p := c.pascal()
+		update := fmt.Sprintf(`
+	if s.%s != c.%s {
+		tmp["%s"] = c.%s
+	}`, p, p, o, p)
+		columnUpdates = append(columnUpdates, update)
+	}
+
+	s.TableStructColumnUpdate = strings.Join(columnUpdates, "")
+
+	// hey
+	for i, c := range table.Column {
+		tmp := fmt.Sprintf("\t%s string", c.pascal())
+		comment := c.comment()
+		if comment != "" {
+			tmp = fmt.Sprintf("%s // %s", tmp, comment)
+		}
+		if i != 0 {
+			tmp = fmt.Sprintf("\n%s", tmp)
+		}
+		s.TableStructColumnHey = append(s.TableStructColumnHey, tmp)
+	}
+
+	// column list
+	{
+		lengthColumn := len(table.Column)
+		field := make([]string, 0, lengthColumn)
+		fieldAccess := make([]string, 0, lengthColumn)
+		for i, c := range table.Column {
+			field = append(field, fmt.Sprintf("\"%s\"", *c.ColumnName))
+			fieldPascalName := c.pascal()
+			fieldAccessTmp := fmt.Sprintf("s.%s,", fieldPascalName)
+			if c.ColumnComment != nil {
+				fieldAccessTmp = fmt.Sprintf("%s // %s", fieldAccessTmp, *c.ColumnComment)
+			}
+			fieldAccess = append(fieldAccess, fieldAccessTmp)
+			tmp := fmt.Sprintf("\t\t%s:\"%s\",", fieldPascalName, *c.ColumnName)
+			comment := c.comment()
+			if comment != "" {
+				tmp = fmt.Sprintf("%s // %s", tmp, comment)
+			}
+			if i != 0 {
+				tmp = fmt.Sprintf("\n%s", tmp)
+			}
+			s.TableStructColumnHeyValues = append(s.TableStructColumnHeyValues, tmp)
+		}
+
+		{
+			s96 := string(byte96) // `
+			s34 := `"`            // "
+			s.TableStructColumnHeyFieldSlice = strings.Join(field, ", ")
+			switch s.TypeDriver() {
+			case DriverMysql:
+				s.TableStructColumnHeyFieldSlice = strings.ReplaceAll(s.TableStructColumnHeyFieldSlice, s34, s96)
+			}
+			if strings.Index(s.TableStructColumnHeyFieldSlice, s96) >= 0 {
+				s.TableStructColumnHeyFieldSliceValue = hey.ConcatString(s34, s.TableStructColumnHeyFieldSlice, s34)
+			} else {
+				s.TableStructColumnHeyFieldSliceValue = hey.ConcatString(s96, s.TableStructColumnHeyFieldSlice, s96)
+			}
+		}
+
+		s.TableStructColumnHeyValuesAccess = fmt.Sprintf("[]string{\n\t\t%s\n\t}", strings.Join(fieldAccess, "\n\t\t"))
+
+		fieldAccessMap := fieldAccess[:]
+		for k, v := range fieldAccessMap {
+			fieldAccessMap[k] = strings.Replace(v, ",", ":{},", 1)
+		}
+		s.TableStructColumnHeyValuesAccessMap = fmt.Sprintf("map[string]struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
+	}
+
+	// ignore columns, for insert and update
+	var ignore []string
+
+	// table special fields
+	{
+		// auto increment field or timestamp field
+		cm := make(map[string]*SysColumn)
+		for _, v := range table.Column {
+			if v.ColumnName == nil || *v.ColumnName == "" {
+				continue
+			}
+			// make sure the type is integer
+			if !strings.Contains(v.databaseTypeToGoType(), "int") {
+				continue
+			}
+			cm[*v.ColumnName] = v
+		}
+		fc := func(cols ...string) []string {
+			tmp := make([]string, 0)
+			for k, v := range cols {
+				cols[k] = strings.TrimSpace(v)
+				if _, ok := cm[v]; ok {
+					tmp = append(tmp, v)
+				}
+			}
+			return tmp
+		}
+		autoIncrement := fc(s.FieldsAutoIncrement) // auto increment column
+		if table.TableAutoIncrement != "" && s.FieldsAutoIncrement != table.TableAutoIncrement {
+			autoIncrement = append(autoIncrement, table.TableAutoIncrement)
+		}
+		created := fc(strings.Split(s.FieldsListCreatedAt, ",")...) // created_at columns
+		updated := fc(strings.Split(s.FieldsListUpdatedAt, ",")...) // updated_at columns
+		deleted := fc(strings.Split(s.FieldsListDeletedAt, ",")...) // deleted_at columns
+
+		ignore = append(ignore, autoIncrement[:]...)
+		ignore = append(ignore, created[:]...)
+		ignore = append(ignore, updated[:]...)
+		ignore = append(ignore, deleted[:]...)
+
+		if len(autoIncrement) > 0 && autoIncrement[0] != "" {
+			s.TableColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", pascal(autoIncrement[0]))
+		} else {
+			s.TableColumnAutoIncr = "nil"
+		}
+		cs := func(cols ...string) string {
+			length := len(cols)
+			if length == 0 {
+				return "nil"
+			}
+			for i := 0; i < length; i++ {
+				cols[i] = fmt.Sprintf("s.%s", pascal(cols[i]))
+			}
+			return fmt.Sprintf("[]string{ %s }", strings.Join(cols, ", "))
+		}
+		s.TableColumnCreatedAt = cs(created...)
+		s.TableColumnUpdatedAt = cs(updated...)
+		s.TableColumnDeletedAt = cs(deleted...)
+	}
+
+	ignoreMap := make(map[string]struct{})
+	for _, v := range ignore {
+		ignoreMap[v] = struct{}{}
+	}
+
+	// req
+	write := false
+	for _, c := range table.Column {
+		if _, ok := ignoreMap[*c.ColumnName]; ok {
+			continue // ignore columns like id, created_at, updated_at, deleted_at
+		}
+		opts := ""
+		if c.CharacterMaximumLength != nil && *c.CharacterOctetLength > 0 {
+			opts = fmt.Sprintf(",min=0,max=%d", *c.CharacterMaximumLength)
+		}
+		tmp := fmt.Sprintf("\t%s *%s `json:\"%s\" db:\"%s\" validate:\"omitempty%s\"`",
+			c.pascal(),
+			c.databaseTypeToGoType(),
+			*c.ColumnName,
+			*c.ColumnName,
+			opts,
+		)
+
+		comment := c.comment()
+		if comment != "" {
+			tmp = fmt.Sprintf("%s // %s", tmp, comment)
+		}
+		if write {
+			tmp = fmt.Sprintf("\n%s", tmp)
+		} else {
+			write = true
+		}
+		s.TableStructColumnReq = append(s.TableStructColumnReq, tmp)
+	}
+
+	return
+}
+
+func (s *DbModel) Write() (err error) {
+	// model.go
+	{
+		temp := NewTemplate("tmpl_wire", tmplWire)
+		pkg := "model"
+
+		buf := bytes.NewBuffer(nil)
+		s.buildWire(pkg)
+		if err = temp.Execute(buf, s); err != nil {
+			return
+		}
+
+		filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
+		if err = s.WriteFile(buf, filename); err != nil {
+			return
+		}
+	}
+
+	// model_schema.go
+	{
+		tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
+		tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
+
+		modelSchemaFilename := pathJoin(s.OutputDirectory, "model", "model_schema.go")
+		modelSchemaBuffer := bytes.NewBuffer(nil)
+
+		modelTableCreateFilename := pathJoin(s.OutputDirectory, "model", "table_create.sql")
+		modelTableCreateBuffer := bytes.NewBuffer(nil)
+
+		var create string
+		for _, table := range s.caller.Tables() {
+			{
+				// for table ddl
+				create, err = s.caller.ShowCreateTable(table)
+				if err != nil {
+					return
+				}
+				for strings.HasSuffix(create, "\n") {
+					create = strings.TrimSuffix(create, "\n")
+				}
+				if _, err = modelTableCreateBuffer.WriteString(create); err != nil {
+					return
+				}
+				if !strings.HasSuffix(create, ";") {
+					if _, err = modelTableCreateBuffer.WriteString(";"); err != nil {
+						return
+					}
+				}
+				if _, err = modelTableCreateBuffer.WriteString("\n"); err != nil {
+					return
+				}
+			}
+			modelSchemaContentBuffer := bytes.NewBuffer(nil)
+			s.clean()
+			s.createModelSchemaTable(table)
+			if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, s); err != nil {
+				return
+			}
+			modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("db_%s.go", *table.TableName))
+			if err = s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
+				return
+			}
+
+		}
+
+		if err = tmpModelSchema.Execute(modelSchemaBuffer, s); err != nil {
+			return
+		}
+
+		if err = s.WriteFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
+			return
+		}
+		if err = s.WriteFile(modelTableCreateBuffer, modelTableCreateFilename); err != nil {
+			return
+		}
+
+	}
+
+	return
+}
+
+type DbData struct {
+	*Basis
+
+	// data
+	DataImportModelPackageName string // data.go data import model package name
+	DataMapListDefine          string // data_schema.go tables define
+	DataMapListParams          string // data_schema.go tables params
+	DataMapListAssign          string // data_schema.go tables assign
+	DataMapListStorage         string // data_schema.go tables storage
+	DataMapListSlice           string // data_schema.go tables slice
+}
+
+func (s *DbData) clean() {
+	s.DataMapListDefine = ""
+	s.DataMapListParams = ""
+	s.DataMapListAssign = ""
+	s.DataMapListStorage = ""
+	s.DataMapListSlice = ""
+}
+
+func NewDbData(basis *Basis) *DbData {
+	return &DbData{Basis: basis}
+}
+
+func (s *DbData) createDataSchemaTable(table *SysTable) {
+	s.TableNamePascal = table.pascal()
+	s.TableName = *table.TableName
+	if table.TableComment != nil {
+		s.TableComment = *table.TableComment
+	}
+	if table.TableSchema != nil {
+		s.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, s.TableName)
+	}
+	return
+}
+
+func (s *DbData) Write() (err error) {
+	// data.go
+	{
+		temp := NewTemplate("tmpl_wire", tmplWire)
+		pkg := "data"
+		filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
+		buffer := bytes.NewBuffer(nil)
+		s.buildWire(pkg)
+		if err = temp.Execute(buffer, s); err != nil {
+			return
+		}
+		if err = s.WriteFile(buffer, filename); err != nil {
+			return
+		}
+	}
+
+	// data_schema.go
+	{
+		tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
+		tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
+
+		tables := s.caller.Tables()
+		s.DataImportModelPackageName = s.ImportModelPackageName
+		for _, table := range tables {
+			s.clean()
+			s.createDataSchemaTable(table)
+			schemaContentBuffer := bytes.NewBuffer(nil)
+			if err = tmpDataSchemaContent.Execute(schemaContentBuffer, s); err != nil {
+				return err
+			}
+			schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("db_%s.go", *table.TableName))
+			if err = s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
+				return
+			}
+		}
+
+		filename := pathJoin(s.OutputDirectory, "data", "data_schema.go")
+		buffer := bytes.NewBuffer(nil)
+
+		length := len(tables)
+		defines := make([]string, 0, length)
+		params := make([]string, 0, length)
+		assigns := make([]string, 0, length)
+		storage := make([]string, 0, length)
+		slice := make([]string, 0, length)
+		for _, table := range tables {
+			namePascal := table.pascal()
+			namePascalSmall := table.pascalSmall()
+			defines = append(defines, fmt.Sprintf("%s *%s", namePascal, namePascal))
+			params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascal, namePascalSmall))
+			storage = append(storage, fmt.Sprintf("%s.Table(): %s,", namePascalSmall, namePascalSmall))
+			slice = append(slice, fmt.Sprintf("%s.Table(),", namePascalSmall))
+		}
+		s.DataMapListDefine = strings.Join(defines, "\n\t")
+		s.DataMapListParams = strings.Join(params, "\n\t")
+		s.DataMapListAssign = strings.Join(assigns, "\n\t\t")
+		s.DataMapListStorage = strings.Join(storage, "\n\t\t")
+		s.DataMapListSlice = strings.Join(slice, "\n\t\t")
+		if err = tmpDataSchema.Execute(buffer, s); err != nil {
+			return
+		}
+		if err = s.WriteFile(buffer, filename); err != nil {
+			return
+		}
+	}
+	return
+}
+
+type DbBiz struct {
+	*Basis
+
+	// biz
+	BizImportDataPackageName  string // biz.go data import model package name
+	BizAllTablesSchemaContent string // biz.go data all tables schema content
+}
+
+func NewDbBiz(basis *Basis) *DbBiz {
+	return &DbBiz{Basis: basis}
+}
+
+func (s *DbBiz) createBizSchemaTable(table *SysTable) {
+	s.TableNamePascal = table.pascal()
+	s.TableName = *table.TableName
+	if table.TableComment != nil {
+		s.TableComment = *table.TableComment
+	}
+	if table.TableSchema != nil {
+		s.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, s.TableName)
+	}
+	s.TableNameSmallPascal = strings.ToLower(s.TableNamePascal[0:1]) + s.TableNamePascal[1:]
+	return
+}
+
+func (s *DbBiz) Write() (err error) {
+	// biz.tmpl
+	{
+		temp := NewTemplate("tmpl_wire", tmplWire)
+		pkg := "biz"
+		filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.tmpl", pkg))
+		buffer := bytes.NewBuffer(nil)
+		s.buildWire(pkg)
+		if err = temp.Execute(buffer, s); err != nil {
+			return
+		}
+		if err = s.WriteFile(buffer, filename); err != nil {
+			return
+		}
+	}
+
+	// biz_schema.tmpl
+	{
+		tmpBizSchema := NewTemplate("biz_schema", tmplBizSchema)
+		tmpBizSchemaContent := NewTemplate("biz_schema_content", tmplBizSchemaContent)
+
+		buffer := bytes.NewBuffer(nil)
+
+		for _, table := range s.caller.Tables() {
+			s.createBizSchemaTable(table)
+			if err = tmpBizSchemaContent.Execute(buffer, s); err != nil {
+				return err
+			}
+		}
+
+		filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl")
+		bizSchemaBuffer := bytes.NewBuffer(nil)
+		s.BizImportDataPackageName = strings.Replace(s.ImportModelPackageName, "model", "data", 1)
+		s.BizAllTablesSchemaContent = buffer.String()
+		if err = tmpBizSchema.Execute(bizSchemaBuffer, s); err != nil {
+			return err
+		}
+		if err = s.WriteFile(bizSchemaBuffer, filename); err != nil {
+			return
+		}
+	}
+
+	// common.go
+	{
+		if !s.BizCommon {
+			return
+		}
+		temp := NewTemplate("tmpl_biz_common", tmplBizCommon)
+
+		pkg := "biz"
+
+		filename := pathJoin(s.OutputDirectory, pkg, "common.go")
+		buffer := bytes.NewBuffer(nil)
+
+		data := &BizCommon{}
+		data.Version = s.Version
+		data.ModuleImportPrefix = strings.TrimSuffix(s.ImportModelPackageName, "model")
+
+		{
+			bcs := strings.Split(s.BizCommonContent, ",")
+			bcsMapSlice := make(map[string][]string)
+			for _, v := range bcs {
+				v = strings.TrimSpace(strings.ReplaceAll(v, " ", ""))
+				vv := strings.Split(v, ".")
+				if len(vv) != 2 {
+					continue
+				}
+				if _, ok := bcsMapSlice[vv[0]]; !ok {
+					bcsMapSlice[vv[0]] = make([]string, 0, 1)
+				}
+				bcsMapSlice[vv[0]] = append(bcsMapSlice[vv[0]], vv[1])
+			}
+
+			content := bytes.NewBuffer(nil)
+			writeContentMethod := func(table string, field string) error {
+				bcc := &BizCommonContent{
+					TableNamePascal:                   pascal(table),
+					TableAutoIncrementFieldNamePascal: pascal(field),
+				}
+				bccTmpl := NewTemplate("tmpl_biz_common_content", tmplBizCommonContent)
+				return bccTmpl.Execute(content, bcc)
+			}
+			for _, table := range s.caller.Tables() {
+				if table.TableAutoIncrement != "" {
+					if err = writeContentMethod(*table.TableName, table.TableAutoIncrement); err != nil {
+						return
+					}
+				}
+				fieldsExists := make(map[string]struct{})
+				for _, v := range table.Column {
+					fieldsExists[*v.ColumnName] = struct{}{}
+				}
+				if fields, ok := bcsMapSlice[*table.TableName]; ok {
+					for _, f := range fields {
+						if _, ok = fieldsExists[f]; !ok {
+							continue
+						}
+						if err = writeContentMethod(*table.TableName, f); err != nil {
+							return
+						}
+					}
+				}
+			}
+			data.MethodsContent = content.String()
+		}
+
+		if err = temp.Execute(buffer, data); err != nil {
+			return
+		}
+
+		if err = s.WriteFile(buffer, filename); err != nil {
+			return
+		}
+	}
+	return
 }
 
 func NewTemplate(name string, content []byte) *template.Template {
@@ -287,57 +920,6 @@ func (s *SysColumn) comment() string {
 	return *s.ColumnComment
 }
 
-type TemplateData struct {
-	// version
-	TemplateVersion string // template version
-
-	// biz
-	BizImportDataPackageName  string // biz.go data import model package name
-	BizAllTablesSchemaContent string // biz.go data all tables schema content
-
-	// data
-	DataImportModelPackageName string // data.go data import model package name
-	DataAllTablesSchemaContent string // data.go data all tables schema content
-	DataMapListDefine          string // data_schema.go tables define
-	DataMapListParams          string // data_schema.go tables params
-	DataMapListAssign          string // data_schema.go tables assign
-	DataMapListStorage         string // data_schema.go tables storage
-	DataMapListSlice           string // data_schema.go tables slice
-
-	// wire
-	WireDefinePackageName string // wire.go define package name
-	WireContent           string // wire.go content
-
-	// table
-	TableNamePascal      string // 表名(帕斯卡命名)
-	TableName            string // 数据库原始表名
-	TableNameSchema      string // 表模式名称或者数据库名称(表前缀名)
-	TableComment         string // 表注释
-	TableNameWithSchema  string // 表名(带前缀)
-	TableNameSmallPascal string // 表名(小帕斯卡命名)
-
-	// model
-	ModelAllTablesSchemaContent         string   // model.go model all tables schema content
-	TableStructColumn                   []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
-	TableStructColumnHey                []string // 表结构体字段关系定义 ==> Name string // name 名称
-	TableStructColumnHeyFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
-	TableStructColumnHeyFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
-	TableStructColumnReq                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
-	TableStructColumnUpdate             string   // 表结构体字段更新 ==> if s.Id != t.Id { tmp["id"] = t.Id }
-
-	TableStructColumnHeyValues          []string // NewHey.Attribute ==> Name:"name", // 名称
-	TableStructColumnHeyValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
-	TableStructColumnHeyValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
-
-	TableColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
-	TableColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
-	TableColumnUpdatedAt string // 结构体字段方法 ColumnUpdatedAt
-	TableColumnDeletedAt string // 结构体字段方法 ColumnDeletedAt
-
-	// ddl
-	TableDdl string // table ddl
-}
-
 func bufferTable(fn func(i int, table *SysTable) string, tables ...*SysTable) *bytes.Buffer {
 	buffer := bytes.NewBuffer(nil)
 	for index, table := range tables {
@@ -346,266 +928,9 @@ func bufferTable(fn func(i int, table *SysTable) string, tables ...*SysTable) *b
 	return buffer
 }
 
-func buildWire(pkg string, tables []*SysTable) *TemplateData {
-	fn := func(i int, table *SysTable) string {
-		tmp := fmt.Sprintf("New%s,", table.pascal())
-		if i > 0 {
-			tmp = fmt.Sprintf("\n\t%s", tmp)
-		}
-		comment := table.comment()
-		if comment != "" {
-			tmp = fmt.Sprintf("%s // %s", tmp, comment)
-		}
-		return tmp
-	}
-	buffer := bufferTable(fn, tables...)
-	if pkg == "data" {
-		buffer.WriteString(fmt.Sprintf("\n\tNewTables, // all instances"))
-	}
-	return &TemplateData{
-		WireDefinePackageName: pkg,
-		WireContent:           buffer.String(),
-	}
-}
-
-// createModel create model.go
-func (s *Param) createModel() (err error) {
-	temp := NewTemplate("tmpl_wire", tmplWire)
-	pkg := "model"
-	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-	data := buildWire(pkg, s.caller.Tables())
-	data.TemplateVersion = s.Version
-	if err = temp.Execute(fil, data); err != nil {
-		return
-	}
-	return
-}
-
-// createModelSchema create model_schema.go
-func (s *Param) createModelSchema() (err error) {
-	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
-	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
-
-	modelSchemaFilename := pathJoin(s.OutputDirectory, "model", "model_schema.go")
-	var modelSchemaContent *os.File
-	if modelSchemaContent, err = createFile(modelSchemaFilename); err != nil {
-		return
-	}
-	defer func() {
-		_ = modelSchemaContent.Close()
-		if err != nil {
-			_ = os.Remove(modelSchemaFilename)
-		}
-	}()
-
-	modelSchemaContentBuffer := bytes.NewBuffer(nil)
-
-	modelTableCreateFilename := pathJoin(s.OutputDirectory, "model", "table_create.sql")
-	var modelTableCreateContent *os.File
-	if modelTableCreateContent, err = createFile(modelTableCreateFilename); err != nil {
-		return
-	}
-	defer func() {
-		_ = modelTableCreateContent.Close()
-		if err != nil {
-			_ = os.Remove(modelTableCreateFilename)
-		}
-	}()
-
-	create := ""
-	for _, table := range s.caller.Tables() {
-		{
-
-			// for table ddl
-			create, err = s.caller.ShowCreateTable(table)
-			if err != nil {
-				return
-			}
-			for strings.HasSuffix(create, "\n") {
-				create = strings.TrimSuffix(create, "\n")
-			}
-			if _, err = modelTableCreateContent.WriteString(create); err != nil {
-				return
-			}
-			if !strings.HasSuffix(create, ";") {
-				if _, err = modelTableCreateContent.WriteString(";"); err != nil {
-					return
-				}
-			}
-			if _, err = modelTableCreateContent.WriteString("\n"); err != nil {
-				return
-			}
-		}
-		data := s.createModelSchemaTable(table)
-		data.TemplateVersion = s.Version
-		if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, data); err != nil {
-			return
-		}
-	}
-
-	data := &TemplateData{
-		TemplateVersion:             s.Version,
-		ModelAllTablesSchemaContent: modelSchemaContentBuffer.String(),
-	}
-	if err = tmpModelSchema.Execute(modelSchemaContent, data); err != nil {
-		return
-	}
-	return
-}
-
-// createData create data.go
-func (s *Param) createData() (err error) {
-	temp := NewTemplate("tmpl_wire", tmplWire)
-	pkg := "data"
-	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.go", pkg))
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-	data := buildWire(pkg, s.caller.Tables())
-	data.TemplateVersion = s.Version
-	if err = temp.Execute(fil, data); err != nil {
-		return
-	}
-	return
-}
-
-// createDataSchema create data_schema.go
-func (s *Param) createDataSchema() (err error) {
-	tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
-	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
-
-	contents := bytes.NewBuffer(nil)
-	tables := s.caller.Tables()
-	for _, table := range tables {
-		data := s.createDataSchemaTable(table)
-		data.TemplateVersion = s.Version
-		if err = tmpDataSchemaContent.Execute(contents, data); err != nil {
-			return err
-		}
-	}
-
-	filename := pathJoin(s.OutputDirectory, "data", "data_schema.go")
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-	data := &TemplateData{
-		TemplateVersion:            s.Version,
-		DataImportModelPackageName: s.ImportModelPackageName,
-		DataAllTablesSchemaContent: contents.String(),
-	}
-	length := len(tables)
-	defines := make([]string, 0, length)
-	params := make([]string, 0, length)
-	assigns := make([]string, 0, length)
-	storage := make([]string, 0, length)
-	slice := make([]string, 0, length)
-	for _, table := range tables {
-		namePascal := table.pascal()
-		namePascalSmall := table.pascalSmall()
-		defines = append(defines, fmt.Sprintf("%s *%s", namePascal, namePascal))
-		params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
-		assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascal, namePascalSmall))
-		storage = append(storage, fmt.Sprintf("%s.Table(): %s,", namePascalSmall, namePascalSmall))
-		slice = append(slice, fmt.Sprintf("%s.Table(),", namePascalSmall))
-	}
-	data.DataMapListDefine = strings.Join(defines, "\n\t")
-	data.DataMapListParams = strings.Join(params, "\n\t")
-	data.DataMapListAssign = strings.Join(assigns, "\n\t\t")
-	data.DataMapListStorage = strings.Join(storage, "\n\t\t")
-	data.DataMapListSlice = strings.Join(slice, "\n\t\t")
-	if err = tmpDataSchema.Execute(fil, data); err != nil {
-		return
-	}
-	return
-}
-
-// createBiz create biz.tmpl
-func (s *Param) createBiz() (err error) {
-	temp := NewTemplate("tmpl_wire", tmplWire)
-	pkg := "biz"
-	filename := pathJoin(s.OutputDirectory, pkg, fmt.Sprintf("%s.tmpl", pkg))
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-	data := buildWire(pkg, s.caller.Tables())
-	data.TemplateVersion = s.Version
-	if err = temp.Execute(fil, data); err != nil {
-		return
-	}
-	return
-}
-
-// createBizSchema create biz_schema.tmpl
-func (s *Param) createBizSchema() (err error) {
-	tmpBizSchema := NewTemplate("biz_schema", tmplBizSchema)
-	tmpBizSchemaContent := NewTemplate("biz_schema_content", tmplBizSchemaContent)
-
-	buf := bytes.NewBuffer(nil)
-
-	for _, table := range s.caller.Tables() {
-		data := s.createBizSchemaTable(table)
-		data.TemplateVersion = s.Version
-		if err = tmpBizSchemaContent.Execute(buf, data); err != nil {
-			return err
-		}
-	}
-
-	filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl")
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-	data := &TemplateData{
-		TemplateVersion:           s.Version,
-		BizImportDataPackageName:  strings.Replace(s.ImportModelPackageName, "model", "data", 1),
-		BizAllTablesSchemaContent: buf.String(),
-	}
-	if err = tmpBizSchema.Execute(fil, data); err != nil {
-		return err
-	}
-	return
-}
-
 type BizCommon struct {
 	// version
-	TemplateVersion string // template version
+	Version string // template version
 
 	ModuleImportPrefix string // import prefix
 
@@ -616,85 +941,6 @@ type BizCommonContent struct {
 	TableNamePascal                   string
 	TableAutoIncrementFieldName       string
 	TableAutoIncrementFieldNamePascal string
-}
-
-// createBizCommon create biz/common.go
-func (s *Param) createBizCommon() (err error) {
-	if !s.BizCommon {
-		return
-	}
-	temp := NewTemplate("tmpl_biz_common", tmplBizCommon)
-
-	pkg := "biz"
-
-	filename := pathJoin(s.OutputDirectory, pkg, "common.go")
-	var fil *os.File
-	if fil, err = createFile(filename); err != nil {
-		return
-	}
-	defer func() {
-		_ = fil.Close()
-		if err != nil {
-			_ = os.Remove(filename)
-		}
-	}()
-
-	data := &BizCommon{}
-	data.TemplateVersion = s.Version
-	data.ModuleImportPrefix = strings.TrimSuffix(s.ImportModelPackageName, "model")
-
-	{
-		bcs := strings.Split(s.BizCommonContent, ",")
-		bcsMapSlice := make(map[string][]string)
-		for _, v := range bcs {
-			v = strings.TrimSpace(strings.ReplaceAll(v, " ", ""))
-			vv := strings.Split(v, ".")
-			if len(vv) != 2 {
-				continue
-			}
-			if _, ok := bcsMapSlice[vv[0]]; !ok {
-				bcsMapSlice[vv[0]] = make([]string, 0, 1)
-			}
-			bcsMapSlice[vv[0]] = append(bcsMapSlice[vv[0]], vv[1])
-		}
-
-		content := bytes.NewBuffer(nil)
-		writeContentMethod := func(table string, field string) error {
-			bcc := &BizCommonContent{
-				TableNamePascal:                   pascal(table),
-				TableAutoIncrementFieldNamePascal: pascal(field),
-			}
-			bccTmpl := NewTemplate("tmpl_biz_common_content", tmplBizCommonContent)
-			return bccTmpl.Execute(content, bcc)
-		}
-		for _, table := range s.caller.Tables() {
-			if table.TableAutoIncrement != "" {
-				if err = writeContentMethod(*table.TableName, table.TableAutoIncrement); err != nil {
-					return
-				}
-			}
-			fieldsExists := make(map[string]struct{})
-			for _, v := range table.Column {
-				fieldsExists[*v.ColumnName] = struct{}{}
-			}
-			if fields, ok := bcsMapSlice[*table.TableName]; ok {
-				for _, f := range fields {
-					if _, ok = fieldsExists[f]; !ok {
-						continue
-					}
-					if err = writeContentMethod(*table.TableName, f); err != nil {
-						return
-					}
-				}
-			}
-		}
-		data.MethodsContent = content.String()
-	}
-
-	if err = temp.Execute(fil, data); err != nil {
-		return
-	}
-	return
 }
 
 // BuildAll build all template
@@ -715,271 +961,17 @@ func (s *Param) BuildAll() error {
 	if err = s.caller.Queries(); err != nil {
 		return err
 	}
+	basis := NewBasis(s)
 	// model
-	if err = s.createModel(); err != nil {
-		return err
-	}
-	if err = s.createModelSchema(); err != nil {
-		return err
-	}
-	// data
-	if err = s.createData(); err != nil {
-		return err
-	}
-	if err = s.createDataSchema(); err != nil {
-		return err
-	}
-	// biz
-	if err = s.createBiz(); err != nil {
-		return err
-	}
-	if err = s.createBizSchema(); err != nil {
-		return err
-	}
-	if err = s.createBizCommon(); err != nil {
-		return err
+	writer := make([]Writer, 0, 4)
+	writer = append(writer, NewDbModel(basis))
+	writer = append(writer, NewDbData(basis))
+	writer = append(writer, NewDbBiz(basis))
+	writer = append(writer, NewDbModel(basis))
+	for _, w := range writer {
+		if err = w.Write(); err != nil {
+			return err
+		}
 	}
 	return nil
-}
-
-// createBizSchemaTable create biz schema table
-func (s *Param) createBizSchemaTable(table *SysTable) (model *TemplateData) {
-	model = &TemplateData{
-		TableNamePascal: table.pascal(),
-		TableName:       *table.TableName,
-		TableNameSchema: "",
-		TableComment:    "",
-	}
-	if table.TableComment != nil {
-		model.TableComment = *table.TableComment
-	}
-	if table.TableSchema != nil {
-		model.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, model.TableName)
-	}
-	model.TableNameSmallPascal = strings.ToLower(model.TableNamePascal[0:1]) + model.TableNamePascal[1:]
-	return
-}
-
-// createDataSchemaTable create data schema table
-func (s *Param) createDataSchemaTable(table *SysTable) (model *TemplateData) {
-	model = &TemplateData{
-		TableNamePascal: table.pascal(),
-		TableName:       *table.TableName,
-		TableNameSchema: "",
-		TableComment:    "",
-	}
-	if table.TableComment != nil {
-		model.TableComment = *table.TableComment
-	}
-	if table.TableSchema != nil {
-		model.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, model.TableName)
-	}
-	return
-}
-
-// createModelSchemaTable create model schema table
-func (s *Param) createModelSchemaTable(table *SysTable) (model *TemplateData) {
-	model = &TemplateData{
-		TableNamePascal: table.pascal(),
-		TableName:       *table.TableName,
-	}
-	if table.TableComment != nil {
-		model.TableComment = *table.TableComment
-	}
-	if table.TableSchema != nil {
-		if s.UsingDatabaseSchemaName {
-			model.TableNameWithSchema = fmt.Sprintf("%s.%s", *table.TableSchema, model.TableName)
-		} else {
-			model.TableNameWithSchema = model.TableName
-		}
-	}
-
-	columnUpdates := make([]string, 0)
-
-	// struct define
-	for i, c := range table.Column {
-		tmp := fmt.Sprintf("\t%s %s `json:\"%s\" db:\"%s\"`",
-			c.pascal(),
-			c.databaseTypeToGoType(),
-			*c.ColumnName,
-			*c.ColumnName,
-		)
-		comment := c.comment()
-		if comment != "" {
-			tmp = fmt.Sprintf("%s // %s", tmp, comment)
-		}
-		if i != 0 {
-			tmp = fmt.Sprintf("\n%s", tmp)
-		}
-		model.TableStructColumn = append(model.TableStructColumn, tmp)
-
-		// update column
-		o := *c.ColumnName
-		p := c.pascal()
-		update := fmt.Sprintf(`
-	if s.%s != c.%s {
-		tmp["%s"] = c.%s
-	}`, p, p, o, p)
-		columnUpdates = append(columnUpdates, update)
-	}
-
-	model.TableStructColumnUpdate = strings.Join(columnUpdates, "")
-
-	// hey
-	for i, c := range table.Column {
-		tmp := fmt.Sprintf("\t%s string", c.pascal())
-		comment := c.comment()
-		if comment != "" {
-			tmp = fmt.Sprintf("%s // %s", tmp, comment)
-		}
-		if i != 0 {
-			tmp = fmt.Sprintf("\n%s", tmp)
-		}
-		model.TableStructColumnHey = append(model.TableStructColumnHey, tmp)
-	}
-
-	// column list
-	{
-		lengthColumn := len(table.Column)
-		field := make([]string, 0, lengthColumn)
-		fieldAccess := make([]string, 0, lengthColumn)
-		for i, c := range table.Column {
-			field = append(field, fmt.Sprintf("\"%s\"", *c.ColumnName))
-			fieldPascalName := c.pascal()
-			fieldAccessTmp := fmt.Sprintf("s.%s,", fieldPascalName)
-			if c.ColumnComment != nil {
-				fieldAccessTmp = fmt.Sprintf("%s // %s", fieldAccessTmp, *c.ColumnComment)
-			}
-			fieldAccess = append(fieldAccess, fieldAccessTmp)
-			tmp := fmt.Sprintf("\t\t%s:\"%s\",", fieldPascalName, *c.ColumnName)
-			comment := c.comment()
-			if comment != "" {
-				tmp = fmt.Sprintf("%s // %s", tmp, comment)
-			}
-			if i != 0 {
-				tmp = fmt.Sprintf("\n%s", tmp)
-			}
-			model.TableStructColumnHeyValues = append(model.TableStructColumnHeyValues, tmp)
-		}
-
-		{
-			s96 := string(byte96) // `
-			s34 := `"`            // "
-			model.TableStructColumnHeyFieldSlice = strings.Join(field, ", ")
-			switch s.TypeDriver() {
-			case DriverMysql:
-				model.TableStructColumnHeyFieldSlice = strings.ReplaceAll(model.TableStructColumnHeyFieldSlice, s34, s96)
-			}
-			if strings.Index(model.TableStructColumnHeyFieldSlice, s96) >= 0 {
-				model.TableStructColumnHeyFieldSliceValue = hey.ConcatString(s34, model.TableStructColumnHeyFieldSlice, s34)
-			} else {
-				model.TableStructColumnHeyFieldSliceValue = hey.ConcatString(s96, model.TableStructColumnHeyFieldSlice, s96)
-			}
-		}
-
-		model.TableStructColumnHeyValuesAccess = fmt.Sprintf("[]string{\n\t\t%s\n\t}", strings.Join(fieldAccess, "\n\t\t"))
-
-		fieldAccessMap := fieldAccess[:]
-		for k, v := range fieldAccessMap {
-			fieldAccessMap[k] = strings.Replace(v, ",", ":{},", 1)
-		}
-		model.TableStructColumnHeyValuesAccessMap = fmt.Sprintf("map[string]struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
-	}
-
-	// ignore columns, for insert and update
-	var ignore []string
-
-	// table special fields
-	{
-		// auto increment field or timestamp field
-		cm := make(map[string]*SysColumn)
-		for _, v := range table.Column {
-			if v.ColumnName == nil || *v.ColumnName == "" {
-				continue
-			}
-			// make sure the type is integer
-			if !strings.Contains(v.databaseTypeToGoType(), "int") {
-				continue
-			}
-			cm[*v.ColumnName] = v
-		}
-		fc := func(cols ...string) []string {
-			tmp := make([]string, 0)
-			for k, v := range cols {
-				cols[k] = strings.TrimSpace(v)
-				if _, ok := cm[v]; ok {
-					tmp = append(tmp, v)
-				}
-			}
-			return tmp
-		}
-		autoIncrement := fc(s.FieldsAutoIncrement) // auto increment column
-		if table.TableAutoIncrement != "" && s.FieldsAutoIncrement != table.TableAutoIncrement {
-			autoIncrement = append(autoIncrement, table.TableAutoIncrement)
-		}
-		created := fc(strings.Split(s.FieldsListCreatedAt, ",")...) // created_at columns
-		updated := fc(strings.Split(s.FieldsListUpdatedAt, ",")...) // updated_at columns
-		deleted := fc(strings.Split(s.FieldsListDeletedAt, ",")...) // deleted_at columns
-
-		ignore = append(ignore, autoIncrement[:]...)
-		ignore = append(ignore, created[:]...)
-		ignore = append(ignore, updated[:]...)
-		ignore = append(ignore, deleted[:]...)
-
-		if len(autoIncrement) > 0 && autoIncrement[0] != "" {
-			model.TableColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", pascal(autoIncrement[0]))
-		} else {
-			model.TableColumnAutoIncr = "nil"
-		}
-		cs := func(cols ...string) string {
-			length := len(cols)
-			if length == 0 {
-				return "nil"
-			}
-			for i := 0; i < length; i++ {
-				cols[i] = fmt.Sprintf("s.%s", pascal(cols[i]))
-			}
-			return fmt.Sprintf("[]string{ %s }", strings.Join(cols, ", "))
-		}
-		model.TableColumnCreatedAt = cs(created...)
-		model.TableColumnUpdatedAt = cs(updated...)
-		model.TableColumnDeletedAt = cs(deleted...)
-	}
-
-	ignoreMap := make(map[string]struct{})
-	for _, v := range ignore {
-		ignoreMap[v] = struct{}{}
-	}
-
-	// req
-	write := false
-	for _, c := range table.Column {
-		if _, ok := ignoreMap[*c.ColumnName]; ok {
-			continue // ignore columns like id, created_at, updated_at, deleted_at
-		}
-		opts := ""
-		if c.CharacterMaximumLength != nil && *c.CharacterOctetLength > 0 {
-			opts = fmt.Sprintf(",min=0,max=%d", *c.CharacterMaximumLength)
-		}
-		tmp := fmt.Sprintf("\t%s *%s `json:\"%s\" db:\"%s\" validate:\"omitempty%s\"`",
-			c.pascal(),
-			c.databaseTypeToGoType(),
-			*c.ColumnName,
-			*c.ColumnName,
-			opts,
-		)
-
-		comment := c.comment()
-		if comment != "" {
-			tmp = fmt.Sprintf("%s // %s", tmp, comment)
-		}
-		if write {
-			tmp = fmt.Sprintf("\n%s", tmp)
-		} else {
-			write = true
-		}
-		model.TableStructColumnReq = append(model.TableStructColumnReq, tmp)
-	}
-
-	return
 }

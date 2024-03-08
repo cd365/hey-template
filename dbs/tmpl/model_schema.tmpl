@@ -1,9 +1,11 @@
-// hey-template version: {{{.TemplateVersion}}}
+// hey-template version: {{{.Version}}}
 
 package model
 
 import (
 	"database/sql"
+
+	"errors"
 
 	"github.com/cd365/hey"
 )
@@ -25,6 +27,11 @@ const (
 	SwitchYes = "Y"
 	SwitchOn  = "ON"
 	SwitchOff = "OFF"
+)
+
+var (
+    ErrNotFound       = errors.New("the record does not exist")
+    ErrNoAffectedRows = errors.New("there are no affected rows")
 )
 
 type Table interface {
@@ -89,4 +96,3 @@ func TablePseudoDelete(table Table, filter hey.Filter, pseudo map[string]interfa
     }
 	return table.Update(filter, pseudo, way...)
 }
-{{{.ModelAllTablesSchemaContent}}}
