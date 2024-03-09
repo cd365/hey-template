@@ -39,7 +39,7 @@ const (
 type Caller interface {
 	Queries() error
 	Tables() []*SysTable
-	ShowCreateTable(table *SysTable) (string, error)
+	ShowCreateTable(table *SysTable) error
 }
 
 type Writer interface {
@@ -52,8 +52,7 @@ type Param struct {
 	DataSourceName          string   // data source name
 	DatabaseSchemaName      string   // 数据库模式名称
 	ImportModelPackageName  string   // model包全名
-	BizCommon               bool     // biz common.go
-	BizCommonContent        string   // biz common.go table1.field1,table2.field2,table3.field3...
+	TableFieldMethodOfData  string   // method of table.field table1.field1,table2.field2,table3.field3...
 	UsingDatabaseSchemaName bool     // 是否在表名之前使用模式前缀名称 mysql:数据库名 pgsql:模式名
 	FieldsAutoIncrement     string   // 表自动递增字段
 	FieldsListCreatedAt     string   // 创建时间戳字段列表, 多个","隔开
@@ -81,17 +80,14 @@ var (
 	//go:embed tmpl/data_schema_content.tmpl
 	tmplDataSchemaContent []byte
 
+	//go:embed tmpl/data_schema_content_custom.tmpl
+	tmplDataSchemaContentCustom []byte
+
 	//go:embed tmpl/biz_schema.tmpl
 	tmplBizSchema []byte
 
 	//go:embed tmpl/biz_schema_content.tmpl
 	tmplBizSchemaContent []byte
-
-	//go:embed tmpl/biz_common.tmpl
-	tmplBizCommon []byte
-
-	//go:embed tmpl/biz_common_content.tmpl
-	tmplBizCommonContent []byte
 
 	//go:embed pgsql_func_create.sql
 	pgsqlFuncCreate string
@@ -144,6 +140,61 @@ func (s *Param) initialize() error {
 		}
 	default:
 		err = fmt.Errorf("unsupported driver name: %s", s.Driver)
+	}
+	return nil
+}
+
+func (s *Param) parseCustomTableFields() map[string][]string {
+	bcs := strings.Split(s.TableFieldMethodOfData, ",")
+	bcsMapSlice := make(map[string][]string)
+	for _, v := range bcs {
+		v = strings.TrimSpace(strings.ReplaceAll(v, " ", ""))
+		vv := strings.Split(v, ".")
+		if len(vv) != 2 {
+			continue
+		}
+		if _, ok := bcsMapSlice[vv[0]]; !ok {
+			bcsMapSlice[vv[0]] = make([]string, 0, 1)
+		}
+		bcsMapSlice[vv[0]] = append(bcsMapSlice[vv[0]], vv[1])
+	}
+	return bcsMapSlice
+}
+
+// BuildAll build all template
+func (s *Param) BuildAll() error {
+	err := s.initialize()
+	if err != nil {
+		return err
+	}
+	switch TypeDriver(s.Driver) {
+	case DriverMysql:
+	case DriverPostgres:
+		if _, err = s.way.DB().Exec(pgsqlFuncCreate); err != nil {
+			return err
+		}
+		defer func() { _, _ = s.way.DB().Exec(pgsqlFuncDrop) }()
+	}
+	// query
+	if err = s.caller.Queries(); err != nil {
+		return err
+	}
+	// show create table
+	for _, table := range s.caller.Tables() {
+		if err = s.caller.ShowCreateTable(table); err != nil {
+			return err
+		}
+	}
+	basis := NewBasis(s)
+	// build model, data, biz
+	writer := make([]Writer, 0, 4)
+	writer = append(writer, NewDbModel(basis))
+	writer = append(writer, NewDbData(basis))
+	writer = append(writer, NewDbBiz(basis))
+	for _, w := range writer {
+		if err = w.Write(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -479,21 +530,17 @@ func (s *DbModel) Write() (err error) {
 		modelTableCreateFilename := pathJoin(s.OutputDirectory, "model", "table_create.sql")
 		modelTableCreateBuffer := bytes.NewBuffer(nil)
 
-		var create string
 		for _, table := range s.caller.Tables() {
 			{
 				// for table ddl
-				create, err = s.caller.ShowCreateTable(table)
-				if err != nil {
+				ddl := table.DDL
+				for strings.HasSuffix(ddl, "\n") {
+					ddl = strings.TrimSuffix(ddl, "\n")
+				}
+				if _, err = modelTableCreateBuffer.WriteString(ddl); err != nil {
 					return
 				}
-				for strings.HasSuffix(create, "\n") {
-					create = strings.TrimSuffix(create, "\n")
-				}
-				if _, err = modelTableCreateBuffer.WriteString(create); err != nil {
-					return
-				}
-				if !strings.HasSuffix(create, ";") {
+				if !strings.HasSuffix(ddl, ";") {
 					if _, err = modelTableCreateBuffer.WriteString(";"); err != nil {
 						return
 					}
@@ -541,6 +588,8 @@ type DbData struct {
 	DataMapListAssign          string // data_schema.go tables assign
 	DataMapListStorage         string // data_schema.go tables storage
 	DataMapListSlice           string // data_schema.go tables slice
+
+	DataCustomMethod string // data custom methods
 }
 
 func (s *DbData) clean() {
@@ -563,6 +612,49 @@ func (s *DbData) createDataSchemaTable(table *SysTable) {
 	}
 	if table.TableSchema != nil {
 		s.TableNameSchema = fmt.Sprintf("%s.%s", *table.TableSchema, s.TableName)
+	}
+	return
+}
+
+type DataSchemaContentCustom struct {
+	TableNamePascal      string
+	TableFieldNamePascal string
+}
+
+func (s *DbData) customMethod(table *SysTable) (buffer *bytes.Buffer, err error) {
+	customFields := s.parseCustomTableFields()
+	buffer = bytes.NewBuffer(nil)
+	fields := make([]string, 0)
+	if tmp, ok := customFields[*table.TableName]; ok {
+		fields = append(fields, tmp...)
+	}
+
+	// the primary key of the table, 这里会依赖model
+	if table.TableAutoIncrement != "" {
+		had := false
+		for _, v := range fields {
+			if v == table.TableAutoIncrement {
+				had = true
+				break
+			}
+		}
+		if !had {
+			val := make([]string, 1, 1+len(fields))
+			val[0] = table.TableAutoIncrement
+			val = append(val, fields...)
+			fields = val
+		}
+	}
+
+	for _, field := range fields {
+		value := &DataSchemaContentCustom{
+			TableNamePascal:      s.TableNamePascal,
+			TableFieldNamePascal: pascal(field),
+		}
+		temp := NewTemplate("data_schema_content_custom", tmplDataSchemaContentCustom)
+		if err = temp.Execute(buffer, value); err != nil {
+			return
+		}
 	}
 	return
 }
@@ -590,10 +682,15 @@ func (s *DbData) Write() (err error) {
 
 		tables := s.caller.Tables()
 		s.DataImportModelPackageName = s.ImportModelPackageName
+		var customMethodBuffer *bytes.Buffer
 		for _, table := range tables {
 			s.clean()
 			s.createDataSchemaTable(table)
 			schemaContentBuffer := bytes.NewBuffer(nil)
+			if customMethodBuffer, err = s.customMethod(table); err != nil {
+				return
+			}
+			s.DataCustomMethod = customMethodBuffer.String()
 			if err = tmpDataSchemaContent.Execute(schemaContentBuffer, s); err != nil {
 				return err
 			}
@@ -703,78 +800,6 @@ func (s *DbBiz) Write() (err error) {
 		}
 	}
 
-	// common.go
-	{
-		if !s.BizCommon {
-			return
-		}
-		temp := NewTemplate("tmpl_biz_common", tmplBizCommon)
-
-		pkg := "biz"
-
-		filename := pathJoin(s.OutputDirectory, pkg, "common.go")
-		buffer := bytes.NewBuffer(nil)
-
-		data := &BizCommon{}
-		data.Version = s.Version
-		data.ModuleImportPrefix = strings.TrimSuffix(s.ImportModelPackageName, "model")
-
-		{
-			bcs := strings.Split(s.BizCommonContent, ",")
-			bcsMapSlice := make(map[string][]string)
-			for _, v := range bcs {
-				v = strings.TrimSpace(strings.ReplaceAll(v, " ", ""))
-				vv := strings.Split(v, ".")
-				if len(vv) != 2 {
-					continue
-				}
-				if _, ok := bcsMapSlice[vv[0]]; !ok {
-					bcsMapSlice[vv[0]] = make([]string, 0, 1)
-				}
-				bcsMapSlice[vv[0]] = append(bcsMapSlice[vv[0]], vv[1])
-			}
-
-			content := bytes.NewBuffer(nil)
-			writeContentMethod := func(table string, field string) error {
-				bcc := &BizCommonContent{
-					TableNamePascal:                   pascal(table),
-					TableAutoIncrementFieldNamePascal: pascal(field),
-				}
-				bccTmpl := NewTemplate("tmpl_biz_common_content", tmplBizCommonContent)
-				return bccTmpl.Execute(content, bcc)
-			}
-			for _, table := range s.caller.Tables() {
-				if table.TableAutoIncrement != "" {
-					if err = writeContentMethod(*table.TableName, table.TableAutoIncrement); err != nil {
-						return
-					}
-				}
-				fieldsExists := make(map[string]struct{})
-				for _, v := range table.Column {
-					fieldsExists[*v.ColumnName] = struct{}{}
-				}
-				if fields, ok := bcsMapSlice[*table.TableName]; ok {
-					for _, f := range fields {
-						if _, ok = fieldsExists[f]; !ok {
-							continue
-						}
-						if err = writeContentMethod(*table.TableName, f); err != nil {
-							return
-						}
-					}
-				}
-			}
-			data.MethodsContent = content.String()
-		}
-
-		if err = temp.Execute(buffer, data); err != nil {
-			return
-		}
-
-		if err = s.WriteFile(buffer, filename); err != nil {
-			return
-		}
-	}
 	return
 }
 
@@ -828,6 +853,7 @@ type SysTable struct {
 	TableComment       *string      `db:"table_comment"` // 表注释
 	TableAutoIncrement string       `db:"-"`             // 表自动递增字段名称
 	Column             []*SysColumn `db:"-"`             // 表中的所有字段
+	DDL                string       `db:"-"`             // 表定义语句
 }
 
 func (s *SysTable) pascal() string {
@@ -926,52 +952,4 @@ func bufferTable(fn func(i int, table *SysTable) string, tables ...*SysTable) *b
 		buffer.WriteString(fn(index, table))
 	}
 	return buffer
-}
-
-type BizCommon struct {
-	// version
-	Version string // template version
-
-	ModuleImportPrefix string // import prefix
-
-	MethodsContent string // all table methods content
-}
-
-type BizCommonContent struct {
-	TableNamePascal                   string
-	TableAutoIncrementFieldName       string
-	TableAutoIncrementFieldNamePascal string
-}
-
-// BuildAll build all template
-func (s *Param) BuildAll() error {
-	err := s.initialize()
-	if err != nil {
-		return err
-	}
-	switch TypeDriver(s.Driver) {
-	case DriverMysql:
-	case DriverPostgres:
-		if _, err = s.way.DB().Exec(pgsqlFuncCreate); err != nil {
-			return err
-		}
-		defer func() { _, _ = s.way.DB().Exec(pgsqlFuncDrop) }()
-	}
-	// query
-	if err = s.caller.Queries(); err != nil {
-		return err
-	}
-	basis := NewBasis(s)
-	// model
-	writer := make([]Writer, 0, 4)
-	writer = append(writer, NewDbModel(basis))
-	writer = append(writer, NewDbData(basis))
-	writer = append(writer, NewDbBiz(basis))
-	writer = append(writer, NewDbModel(basis))
-	for _, w := range writer {
-		if err = w.Write(); err != nil {
-			return err
-		}
-	}
-	return nil
 }

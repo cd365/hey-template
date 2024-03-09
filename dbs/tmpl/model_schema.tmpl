@@ -58,12 +58,34 @@ type Table interface {
     Insert(insert interface{}, way ...*hey.Way) (int64, error)
     Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
     // Update the object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct
-    Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error)
+    Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
     Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
     SelectGetAll(query func(get *hey.Get), way ...*hey.Way) (interface{}, error)
     SelectGetOne(query func(get *hey.Get), way ...*hey.Way) (interface{}, error)
     Count(filter hey.Filter) (int64, error)
+}
+
+func TableUpdate(table Table, update interface{}, updateExceptFields ...string) map[string]interface{} {
+	exceptMap := make(map[string]struct{})
+	updateExceptFields = append(updateExceptFields, table.ModExcept()...)
+	for _, field := range updateExceptFields {
+		exceptMap[field] = struct{}{}
+	}
+	result, ok := update.(map[string]interface{})
+	if !ok {
+		result = make(map[string]interface{})
+		fields, values := hey.StructModify(update, table.W().Tag(), table.ModExcept()...)
+		for index, field := range fields {
+			result[field] = values[index]
+		}
+	}
+	for field := range result {
+		if _, ok = exceptMap[field]; ok || !table.FieldExist(field) {
+			delete(result, field)
+		}
+	}
+	return result
 }
 
 // TableCompareUpdateByUniqueFilter compare and update one row by unique key filter(only using equal)

@@ -147,7 +147,7 @@ func (s *Pgsql) Tables() []*SysTable {
 
 var pgSeq = regexp.MustCompile(`^nextval\('([A-Za-z0-9_]+)'::regclass\)$`)
 
-func (s *Pgsql) ShowCreateTable(table *SysTable) (string, error) {
+func (s *Pgsql) ShowCreateTable(table *SysTable) error {
 	var createSequence string
 	for _, c := range table.Column {
 		if c.ColumnDefault == nil {
@@ -176,11 +176,12 @@ func (s *Pgsql) ShowCreateTable(table *SysTable) (string, error) {
 		return nil
 	}, prepare)
 	if err != nil {
-		return "", err
+		return err
 	}
 	result = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
 	result = strings.ReplaceAll(result, "CREATE INDEX", "CREATE INDEX IF NOT EXISTS")
 	result = strings.ReplaceAll(result, "CREATE UNIQUE INDEX", "CREATE UNIQUE INDEX IF NOT EXISTS")
 	result = createSequence + result
-	return result, nil
+	table.DDL = result
+	return nil
 }

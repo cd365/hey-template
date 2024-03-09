@@ -71,7 +71,7 @@ func (s *Mysql) Tables() []*SysTable {
 	return s.tables
 }
 
-func (s *Mysql) ShowCreateTable(table *SysTable) (string, error) {
+func (s *Mysql) ShowCreateTable(table *SysTable) error {
 	for _, c := range table.Column {
 		if c.Extra != nil && strings.ToLower(*c.Extra) == "auto_increment" {
 			table.TableAutoIncrement = *c.ColumnName
@@ -89,8 +89,8 @@ func (s *Mysql) ShowCreateTable(table *SysTable) (string, error) {
 		return nil
 	}, prepare)
 	if err != nil {
-		return "", err
+		return err
 	}
-	result = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
-	return result, nil
+	table.DDL = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+	return nil
 }

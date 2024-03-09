@@ -149,23 +149,8 @@ func (s *{{{.TableNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int
 	return s.Del(way...).Where(filter).Del()
 }
 
-func (s *{{{.TableNamePascal}}}) Update(filter hey.Filter, update interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
-		mod.Where(s.F().Filter(filter))
-		tmp, ok := update.(map[string]interface{})
-		if !ok {
-		    tmp = make(map[string]interface{})
-			fields, values := hey.StructModify(update, s.W().Tag(), s.ModExcept()...)
-			for index, field := range fields {
-				tmp[field] = values[index]
-			}
-		}
-		for k, v := range tmp {
-			if s.FieldExist(k) {
-				mod.Set(k, v)
-			}
-		}
-	}, way...)
+func (s *{{{.TableNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
+	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) { mod.Where(s.F().Filter(filter)).Modify(update) }, way...)
 }
 
 func (s *{{{.TableNamePascal}}}) Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error {
@@ -298,3 +283,8 @@ func (s *{{{.TableNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way ..
 	}
 	return tmp, nil
 }
+
+/**
+ * table.field custom method
+ */
+{{{.DataCustomMethod}}}
