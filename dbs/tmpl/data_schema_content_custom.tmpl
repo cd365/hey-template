@@ -9,11 +9,17 @@ func (s *{{{.TableNamePascal}}}) SelfSaveBy{{{.TableFieldNamePascal}}}(value int
 	if tmp == nil {
 		return s.Insert(save, way...)
 	}
-	return s.Update(filter, model.TableUpdate(s, save, field), way...)
+	return s.Update(filter, model.HeyTableUpdate(s, save, field), way...)
 }
 
 func (s *{{{.TableNamePascal}}}) SelfRemoveBy{{{.TableFieldNamePascal}}}(values interface{}, way ...*hey.Way) (int64, error) {
 	return s.Delete(s.F().In(s.T().{{{.TableFieldNamePascal}}}, values), way...)
+}
+
+func (s *{{{.TableNamePascal}}}) SelfUpdateBy{{{.TableFieldNamePascal}}}(value interface{}, update interface{}, way ...*hey.Way) (int64, error) {
+	field := s.T().{{{.TableFieldNamePascal}}}
+	filter := s.F().Equal(field, value)
+	return s.Update(filter, model.HeyTableUpdate(s, update, field), way...)
 }
 
 func (s *{{{.TableNamePascal}}}) SelfGetAllBy{{{.TableFieldNamePascal}}}(values interface{}, way ...*hey.Way) ([]*model.{{{.TableNamePascal}}}, error) {
@@ -25,25 +31,15 @@ func (s *{{{.TableNamePascal}}}) SelfGetOneBy{{{.TableFieldNamePascal}}}(value i
 }
 
 func (s *{{{.TableNamePascal}}}) SelfMustSaveBy{{{.TableFieldNamePascal}}}(value interface{}, save interface{}, way ...*hey.Way) error {
-	rowsAffected, err := s.SelfSaveBy{{{.TableFieldNamePascal}}}(value, save, way...)
-	if err != nil {
-		return err
-	}
-	if rowsAffected <= 0 {
-		return model.ErrNoAffectedRows
-	}
-	return nil
+	return model.HeyMustAffectedRows(s.SelfSaveBy{{{.TableFieldNamePascal}}}(value, save, way...))
 }
 
 func (s *{{{.TableNamePascal}}}) SelfMustRemoveBy{{{.TableFieldNamePascal}}}(values interface{}, way ...*hey.Way) error {
-	rowsAffected, err := s.SelfRemoveBy{{{.TableFieldNamePascal}}}(values, way...)
-	if err != nil {
-		return err
-	}
-	if rowsAffected <= 0 {
-		return model.ErrNoAffectedRows
-	}
-	return nil
+	return model.HeyMustAffectedRows(s.SelfRemoveBy{{{.TableFieldNamePascal}}}(values, way...))
+}
+
+func (s *{{{.TableNamePascal}}}) SelfMustUpdateBy{{{.TableFieldNamePascal}}}(value interface{}, update interface{}, way ...*hey.Way) error {
+	return model.HeyMustAffectedRows(s.SelfUpdateBy{{{.TableFieldNamePascal}}}(value, update, way...))
 }
 
 func (s *{{{.TableNamePascal}}}) SelfMustGetAllBy{{{.TableFieldNamePascal}}}(values interface{}, way ...*hey.Way) ([]*model.{{{.TableNamePascal}}}, error) {

@@ -61,12 +61,32 @@ type Table interface {
     Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
     Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
-    SelectGetAll(query func(get *hey.Get), way ...*hey.Way) (interface{}, error)
-    SelectGetOne(query func(get *hey.Get), way ...*hey.Way) (interface{}, error)
     Count(filter hey.Filter) (int64, error)
+    MustInsert(insert interface{}, way ...*hey.Way) error
+    MustDelete(filter hey.Filter, way ...*hey.Way) error
+    MustUpdate(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
 }
 
-func TableUpdate(table Table, update interface{}, updateExceptFields ...string) map[string]interface{} {
+func HeyTableInsert(table Table, add *hey.Add, insert interface{}) {
+	if mp, ok := insert.(map[string]interface{}); ok {
+		for k, v := range mp {
+			if table.FieldExist(k) {
+				add.FieldValue(k, v)
+			}
+		}
+		return
+	}
+	fields, values := hey.StructInsert(insert, table.R().Tag(), table.AddExcept()...)
+	if index := table.NotExistsIndex(fields); len(index) > 0 {
+		fields = hey.RemoveSliceMemberByIndex(index, fields)
+		for k, v := range values {
+			values[k] = hey.RemoveSliceMemberByIndex(index, v)
+		}
+	}
+	add.FieldsValues(fields, values)
+}
+
+func HeyTableUpdate(table Table, update interface{}, updateExceptFields ...string) map[string]interface{} {
 	exceptMap := make(map[string]struct{})
 	updateExceptFields = append(updateExceptFields, table.ModExcept()...)
 	for _, field := range updateExceptFields {
@@ -88,33 +108,12 @@ func TableUpdate(table Table, update interface{}, updateExceptFields ...string) 
 	return result
 }
 
-// TableCompareUpdateByUniqueFilter compare and update one row by unique key filter(only using equal)
-func TableCompareUpdateByUniqueFilter(table Table, uniqueEqualFilter hey.Filter, origin interface{}, latest interface{}, way ...*hey.Way) (int64, error) {
-	if table == nil || uniqueEqualFilter == nil {
-		return 0, nil
+func HeyMustAffectedRows(affectedRows int64, err error) error {
+	if err != nil {
+		return err
 	}
-	if origin == nil && latest != nil {
-		tmp, err := table.SelectGetOne(func(get *hey.Get) { get.Where(uniqueEqualFilter) }, way...)
-		if err != nil {
-			return 0, err
-		}
-		origin = tmp
+	if affectedRows <= 0 {
+		return ErrNoAffectedRows
 	}
-	fields, values := hey.StructUpdate(origin, latest, table.W(way...).Tag())
-	modify := make(map[string]interface{})
-	for k, v := range fields {
-		modify[v] = values[k]
-	}
-	if len(modify) == 0 {
-		return 0, nil
-	}
-	return table.Update(uniqueEqualFilter, modify, way...)
-}
-
-// TablePseudoDelete pseudo delete by filter
-func TablePseudoDelete(table Table, filter hey.Filter, pseudo map[string]interface{}, way ...*hey.Way) (int64, error) {
-    if table == nil || filter == nil || pseudo == nil {
-        return 0, nil
-    }
-	return table.Update(filter, pseudo, way...)
+	return nil
 }
