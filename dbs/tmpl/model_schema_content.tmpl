@@ -7,12 +7,12 @@ type {{{.TableNamePascal}}} struct {
 {{{range $k, $v := .TableStructColumn}}}{{{$v}}}{{{end}}}
 }
 
-func (s *{{{.TableNamePascal}}}) HeyClone() *{{{.TableNamePascal}}} {
+func (s *{{{.TableNamePascal}}}) COPY() *{{{.TableNamePascal}}} {
 	tmp := *s
 	return &tmp
 }
 
-func (s *{{{.TableNamePascal}}}) HeyCompare(c *{{{.TableNamePascal}}}) map[string]interface{} {
+func (s *{{{.TableNamePascal}}}) COMPARE(c *{{{.TableNamePascal}}}) map[string]interface{} {
 	tmp := make(map[string]interface{}){{{.TableStructColumnUpdate}}}
 	if len(tmp) == 0 {
         return nil

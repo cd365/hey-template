@@ -22,11 +22,12 @@ import (
 )
 
 const (
-	byteUnderline byte = '_'
-	byte34             = '"'
-	byte96             = '`'
-	templateLeft       = "{{{"
-	templateRight      = "}}}"
+	byteUnderline       byte = '_'
+	byte34                   = '"'
+	byte96                   = '`'
+	templateLeft             = "{{{"
+	templateRight            = "}}}"
+	tableFilenamePrefix      = "zzz_"
 )
 
 type TypeDriver string
@@ -555,7 +556,7 @@ func (s *DbModel) Write() (err error) {
 			if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, s); err != nil {
 				return
 			}
-			modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("db_%s.go", *table.TableName))
+			modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
 			if err = s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 				return
 			}
@@ -694,7 +695,7 @@ func (s *DbData) Write() (err error) {
 			if err = tmpDataSchemaContent.Execute(schemaContentBuffer, s); err != nil {
 				return err
 			}
-			schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("db_%s.go", *table.TableName))
+			schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
 			if err = s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
 				return
 			}
