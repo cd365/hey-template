@@ -3,10 +3,15 @@ package dbs
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 
 	"github.com/cd365/hey"
+)
+
+var (
+	autoIncrementRegexpReplace = regexp.MustCompile(`(AUTO_INCREMENT|auto_increment)=\d+`)
 )
 
 type Mysql struct {
@@ -92,5 +97,6 @@ func (s *Mysql) ShowCreateTable(table *SysTable) error {
 		return err
 	}
 	table.DDL = strings.ReplaceAll(result, "CREATE TABLE", "CREATE TABLE IF NOT EXISTS")
+	table.DDL = autoIncrementRegexpReplace.ReplaceAllString(table.DDL, "${1}=1")
 	return nil
 }
