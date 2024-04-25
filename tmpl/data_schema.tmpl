@@ -5,26 +5,26 @@ package data
 import (
 	"github.com/cd365/hey"
 
-	"{{{.DataImportModelPackageName}}}"
+	"{{{.PrefixPackage}}}/model"
 )
 
 type Tables struct {
     tableMap map[string]model.Table
     tableSlice []string
-	{{{.DataMapListDefine}}}
+	{{{.MapListDefine}}}
 }
 
 func NewTables(
-	{{{.DataMapListParams}}}
+	{{{.MapListParams}}}
 ) *Tables {
 	s := &Tables{
-		{{{.DataMapListAssign}}}
+		{{{.MapListAssign}}}
 	}
 	s.tableMap = map[string]model.Table{
-        {{{.DataMapListStorage}}}
+        {{{.MapListStorage}}}
     }
     s.tableSlice = []string{
-        {{{.DataMapListSlice}}}
+        {{{.MapListSlice}}}
     }
     return s
 }
@@ -52,10 +52,6 @@ func (s *Tables) SLICE() []string {
 	result := make([]string, length)
 	copy(result, s.tableSlice)
 	return result
-}
-
-func (s *Tables) WHERE() hey.Filter {
-	return hey.NewFilter()
 }
 
 func (s *Tables) WRITER(table model.Table, way ...*hey.Way) Writer {
@@ -89,7 +85,7 @@ func (s *writer) Add(i interface{}, prefix ...func(add *hey.Add)) (int64, error)
 }
 
 func (s *writer) AddMust(i interface{}, prefix ...func(add *hey.Add)) error {
-	return model.HeyMustAffectedRows(s.Add(i, prefix...))
+	return hey.MustAffectedRows(s.Add(i, prefix...))
 }
 
 func (s *writer) Del(where hey.Filter) (int64, error) {
@@ -97,7 +93,7 @@ func (s *writer) Del(where hey.Filter) (int64, error) {
 }
 
 func (s *writer) DelMust(where hey.Filter) error {
-	return model.HeyMustAffectedRows(s.Del(where))
+	return hey.MustAffectedRows(s.Del(where))
 }
 
 func (s *writer) Mod(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) (int64, error) {
@@ -110,5 +106,5 @@ func (s *writer) Mod(where hey.Filter, modify interface{}, prefix ...func(mod *h
 }
 
 func (s *writer) ModMust(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) error {
-	return model.HeyMustAffectedRows(s.Mod(where, modify, prefix...))
+	return hey.MustAffectedRows(s.Mod(where, modify, prefix...))
 }

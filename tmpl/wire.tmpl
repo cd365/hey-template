@@ -1,11 +1,11 @@
 // hey-template version: {{{.Version}}}
 
-package {{{.WireDefinePackageName}}}
+package {{{.Package}}}
 
 import (
 	"github.com/google/wire"
 )
 
 var Provider = wire.NewSet(
-    {{{.WireContent}}}
+    {{{.Content}}}
 )

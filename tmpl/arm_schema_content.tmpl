@@ -1,0 +1,139 @@
+// hey-template version: {{{.Version}}}
+
+package arm
+
+import (
+	"errors"
+	"{{{.PrefixPackage}}}/data"
+	"{{{.PrefixPackage}}}/model"
+	_ "{{{.PrefixPackage}}}/structs/rest"
+	"github.com/cd365/hey"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+)
+
+type {{{.OriginNamePascal}}} struct {
+    *ApiRest
+	table *data.{{{.OriginNamePascal}}}
+	way    hey.WayWriterReader
+}
+
+// New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
+func New{{{.OriginNamePascal}}}(
+    table *data.{{{.OriginNamePascal}}},
+	way hey.WayWriterReader,
+) *{{{.OriginNamePascal}}} {
+	return &{{{.OriginNamePascal}}}{
+	    table: table,
+		way  : way,
+		ApiRest: NewApiRest(table),
+	}
+}
+
+// Route register routes
+func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
+	r := group.Group("/{{{.OriginName}}}", middleware.Recover())
+	r.POST("", s.AdminInsert)
+	r.POST("/batch", s.AdminInsertBatch)
+	r.DELETE("/remove", s.AdminRemove)
+	r.PUT("", s.AdminUpdate)
+	r.GET("", s.AdminSelect)
+	{{{.PseudoDelete}}}
+}
+
+// AdminInsert
+//
+//	@Summary	{{{.Comment}}} 添加
+//	@Tags		后台管理.数据表.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"token"
+//	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body param"
+//	@Success	200				{object}	rest.Resp				"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
+func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
+	req := &model.Add{{{.OriginNamePascal}}}{}
+	return adminWebAdd(ctx, s, req)
+}
+
+// AdminInsertBatch
+//
+//	@Summary	{{{.Comment}}} 批量添加
+//	@Tags		后台管理.数据表.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"token"
+//	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body param"
+//	@Success	200				{object}	rest.Resp				"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/batch [post]
+func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
+	req := make([]*model.Add{{{.OriginNamePascal}}}, 0)
+	return adminWebAddBatch(ctx, s, &req, func() error {
+		if len(req) > MaxAddBatch {
+			return errors.New("too much data")
+		}
+		return nil
+	})
+}
+
+// AdminDelete
+//
+//	@Summary	{{{.Comment}}} 永久删除
+//	@Tags		后台管理.数据表.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		id				query		string		    true	"int value, or int1,int2,int3" 1
+//	@Param		Authorization	header		string	true	"authorization value"
+//	@Success	200				{object}	rest.Resp				"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
+func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
+	return adminWebDel(ctx, s)
+}
+
+// AdminUpdate
+//
+//	@Summary	{{{.Comment}}} 更新
+//	@Tags		后台管理.数据表.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		id				query		string		        true	"int valid"	1
+//	@Param		Authorization	header		string				true	"authorization value"
+//	@Param		object			body		model.Mod{{{.OriginNamePascal}}}	true	"request body param"
+//	@Success	200				{object}	rest.Resp				"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
+func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
+	req := &model.Mod{{{.OriginNamePascal}}}{}
+	return adminWebMod(ctx, s, req)
+}
+
+// AdminSelect
+//
+//	@Summary	{{{.Comment}}} 查询
+//	@Tags		后台管理.数据表.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		data			query		GeneralQuery	false	"object"
+//	@Param		Authorization	header		string			true	"authorization value"
+//	@Success	200				{object}	rest.Resp{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
+func (s *{{{.OriginNamePascal}}}) AdminSelect(ctx echo.Context) error {
+	result := make([]*model.{{{.OriginNamePascal}}}, 0)
+	getQuery := NewGetQuery()
+	getQuery.Set(&result)
+	return adminWebGet(ctx, s, getQuery)
+}
+
+/**
+ * table.field custom method
+ */
+{{{.CustomMethod}}}

@@ -1,4 +1,4 @@
-package dbs
+package main
 
 import (
 	"database/sql"
@@ -6,65 +6,57 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-
-	"github.com/cd365/hey"
 )
 
 var (
 	autoIncrementRegexpReplace = regexp.MustCompile(`(AUTO_INCREMENT|auto_increment)=\d+`)
 )
 
-type Mysql struct {
-	param  *Param
-	way    *hey.Way
+type mysql struct {
+	app    *App
 	tables []*SysTable
 }
 
-func NewMysql(
-	param *Param,
-	way *hey.Way,
-) *Mysql {
-	return &Mysql{
-		param: param,
-		way:   way,
-	}
+func Mysql(app *App) Ber {
+	return &mysql{app: app}
 }
 
-func (s *Mysql) Queries() (err error) {
-	schema := s.param.DatabaseSchemaName
+func (s *mysql) QueryAll() (err error) {
+	schema := s.app.TablePrefixName
 	prepare := "SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, TABLE_COMMENT AS table_comment FROM information_schema.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = ? ORDER BY TABLE_NAME ASC;"
-	if err = s.way.ScanAll(&s.tables, prepare, schema); err != nil {
+	if err = s.app.way.ScanAll(&s.tables, prepare, schema); err != nil {
 		return
 	}
 	once := &sync.Once{}
 	wg := &sync.WaitGroup{}
 	for _, table := range s.tables {
-		table.way = s.way
+		table.app = s.app
 		wg.Add(1)
 		go func(table *SysTable) {
 			defer wg.Done()
-			columns, e := s.getAllColumns(schema, *table.TableName)
-			if e != nil {
-				once.Do(func() { err = e })
-			} else {
-				table.Column = columns
+			columns, qer := s.getAllColumns(schema, table)
+			if qer != nil {
+				once.Do(func() { err = qer })
+				return
 			}
+			table.Column = columns
 		}(table)
 	}
 	wg.Wait()
 	return
 }
 
-func (s *Mysql) getAllColumns(schema string, table string) (list []*SysColumn, err error) {
-	if s.way == nil || schema == "" || table == "" {
+func (s *mysql) getAllColumns(schema string, table *SysTable) (list []*SysColumn, err error) {
+	if schema == "" || table == nil || table.TableName == nil || *table.TableName == "" {
 		return
 	}
 	prepare := "SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, COLUMN_NAME AS column_name, ORDINAL_POSITION AS ordinal_position, COLUMN_DEFAULT AS column_default, IS_NULLABLE AS is_nullable, DATA_TYPE AS data_type, CHARACTER_MAXIMUM_LENGTH AS character_maximum_length, CHARACTER_OCTET_LENGTH AS character_octet_length, NUMERIC_PRECISION AS numeric_precision, NUMERIC_SCALE AS numeric_scale, CHARACTER_SET_NAME AS character_set_name, COLLATION_NAME AS collation_name, COLUMN_COMMENT AS column_comment, COLUMN_TYPE AS column_type, COLUMN_KEY AS column_key, EXTRA AS extra FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ordinal_position ASC"
 	list = make([]*SysColumn, 0)
-	if err = s.way.ScanAll(&list, prepare, schema, table); err != nil {
+	if err = s.app.way.ScanAll(&list, prepare, schema, *table.TableName); err != nil {
 		return
 	}
 	for k, v := range list {
+		v.table = table
 		if v.ColumnComment == nil {
 			list[k].ColumnComment = new(string)
 		}
@@ -72,24 +64,23 @@ func (s *Mysql) getAllColumns(schema string, table string) (list []*SysColumn, e
 	return
 }
 
-func (s *Mysql) Tables() []*SysTable {
+func (s *mysql) AllTable() []*SysTable {
 	return s.tables
 }
 
-func (s *Mysql) ShowCreateTable(table *SysTable) error {
+func (s *mysql) TableDdl(table *SysTable) error {
 	for _, c := range table.Column {
 		if c.Extra != nil && strings.ToLower(*c.Extra) == "auto_increment" {
-			table.TableAutoIncrement = *c.ColumnName
+			table.TableFieldSerial = *c.ColumnName
 		}
 	}
 	prepare := fmt.Sprintf("SHOW CREATE TABLE %s.%s", *table.TableSchema, *table.TableName)
 	name, result := "", ""
-	err := s.way.Query(func(rows *sql.Rows) error {
+	err := s.app.way.Query(func(rows *sql.Rows) error {
 		for rows.Next() {
 			if err := rows.Scan(&name, &result); err != nil {
 				return err
 			}
-			return nil
 		}
 		return nil
 	}, prepare)

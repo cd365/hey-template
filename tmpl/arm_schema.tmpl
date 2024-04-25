@@ -1,0 +1,415 @@
+// hey-template version: {{{.Version}}}
+
+package arm
+
+import (
+	"context"
+	"github.com/cd365/hey"
+	"github.com/labstack/echo/v4"
+	"{{{.PrefixPackage}}}/model"
+	"{{{.PrefixPackage}}}/structs/rest"
+	"strconv"
+	"strings"
+)
+
+type ApiRest struct {
+	table model.Table
+}
+
+func NewApiRest(table model.Table) *ApiRest {
+	return &ApiRest{
+		table: table,
+	}
+}
+
+func (s *ApiRest) Equal(column string, value interface{}) hey.Filter {
+	return hey.F().Equal(column, value)
+}
+
+func (s *ApiRest) In(column string, values ...interface{}) hey.Filter {
+	return hey.F().In(column, values...)
+}
+
+// ApiAdd for api add
+func (s *ApiRest) ApiAdd(ctx context.Context, create interface{}, way ...*hey.Way) (int64, error) {
+	tmp := s.table.Add(way...).Except(s.table.AddExcept()...).Context(ctx).Create(create)
+	s.table.AddAt(tmp, way...)
+	return tmp.Add()
+}
+
+// ApiDel for api del
+func (s *ApiRest) ApiDel(ctx context.Context, where hey.Filter, way ...*hey.Way) (int64, error) {
+	return s.table.Del(way...).Context(ctx).Where(where).Del()
+}
+
+// ApiMod for api mod
+func (s *ApiRest) ApiMod(ctx context.Context, where hey.Filter, modify interface{}, way ...*hey.Way) (int64, error) {
+	tmp := s.table.Mod(way...).Except(s.table.ModExcept()...).Context(ctx).Where(where).Modify(modify)
+	s.table.ModAt(tmp, way...)
+	return tmp.Mod()
+}
+
+// AdminWebAdd 插入一条或者多条(一条sql)
+func (s *ApiRest) AdminWebAdd(ctx context.Context, insert interface{}, way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.ApiAdd(ctx, insert, way...))
+}
+
+func (s *ApiRest) ids(ids string) []interface{} {
+	ids = strings.ReplaceAll(ids, hey.SqlSpace, hey.EmptyString)
+	sss := strings.Split(ids, ",")
+	length := len(sss)
+	if length == 0 {
+		return nil
+	}
+	result := make([]interface{}, 0, length)
+	for i := 0; i < length; i++ {
+		val, err := strconv.ParseInt(sss[i], 10, 64)
+		if err != nil {
+			return nil
+		}
+		result = append(result, val)
+	}
+	return result
+}
+
+// AdminWebDel 删除一条或者多条(一条sql)
+func (s *ApiRest) AdminWebDel(ctx context.Context, id string, way ...*hey.Way) error {
+	ids := s.ids(id)
+	if len(ids) == 0 {
+		return nil
+	}
+	if _, err := s.ApiDel(ctx, hey.F().In(hey.Id, ids...), way...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AdminWebMod 更新一条或者多条(一条sql)(更新多条时设置相同的字段值)
+func (s *ApiRest) AdminWebMod(ctx context.Context, id string, update interface{}, way ...*hey.Way) error {
+	ids := s.ids(id)
+	if len(ids) == 0 {
+		return nil
+	}
+	if _, err := s.ApiMod(ctx, hey.F().In(hey.Id, ids...), update, way...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// AdminWebGet 查询数据
+func (s *ApiRest) AdminWebGet(ctx context.Context, query GetQuery, way ...*hey.Way) error {
+	get := s.table.Get(way...).Context(ctx)
+	a := get.Way().AliasA()
+
+	get.Alias(a.V())
+
+	query.SetIdent(a)
+	fieldMap := hey.Slice2MapNewVal(s.table.Field(), func(v string) string { return a.V(v) })
+	query.SetFieldMap(fieldMap)
+	query.SetWhereMap(fieldMap)
+	query.SetOrderMap(fieldMap)
+
+	fields := query.GetField()
+	if fields == nil {
+		fields = s.table.Field()
+		hey.SliceIter(func(v string) string { return a.V(v) }, fields)
+	}
+	get.Column(fields...)
+
+	get.Joins(query.GetJoins()...)
+
+	if filter, err := query.GetWhere(query.GetWhereMap()); err != nil {
+		return err
+	} else {
+		get.Where(filter)
+	}
+
+	if query.IsCount() {
+		count, err := s.table.Get().Context(ctx).SubQueryGet(get, a.V()).Count()
+		if err != nil {
+			return err
+		}
+		query.SetCount(count)
+		if count == 0 {
+			return nil
+		}
+	}
+
+	get.Order(query.GetOrder(), query.GetOrderMap())
+	get.Limit(query.GetLimit()).Offset(query.GetOffset())
+
+	if err := get.Get(query.Get()); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type GetQuery interface {
+	SetFieldMap(fieldMap map[string]string) GetQuery
+	GetFieldMap() map[string]string
+	AddFieldMap(fieldMap map[string]string) GetQuery
+	SetField(field ...string) GetQuery
+	GetField() []string
+	AddField(field ...string) GetQuery
+
+	SetJoins(joins ...*hey.GetJoin) GetQuery
+	GetJoins() []*hey.GetJoin
+
+	SetWhereMap(whereMap map[string]string) GetQuery
+	GetWhereMap() map[string]string
+	AddWhereMap(whereMap map[string]string) GetQuery
+	GetWhere(fieldMap ...map[string]string) (hey.Filter, error)
+
+	SetOrderMap(orderMap map[string]string) GetQuery
+	GetOrderMap() map[string]string
+	GetOrder() string
+
+	SetLimit(limit int64) GetQuery
+	GetLimit() int64
+
+	SetOffset(offset int64) GetQuery
+	GetOffset() int64
+
+	SetIdent(ident *hey.Ident) GetQuery
+	GetIdent() *hey.Ident
+
+	IsCount() bool
+	SetCount(count int64) GetQuery
+	GetCount() int64
+
+	Set(result interface{}) GetQuery
+	Get() interface{}
+}
+
+type getQuery struct {
+	rest.OfField
+	rest.OfWhere
+	rest.OfMaxId
+	rest.OfMinId
+	rest.OfCount
+	rest.OfOrder
+	rest.OfLimit
+	rest.OfOffset
+	fieldMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 字段名替换, 可能存在表名前缀或者使用别名的情况, 故使用当前map进行替换 map[传入字段名]真实使用字段名
+	joins    []*hey.GetJoin    `json:"-" query:"-" form:"-" validate:"-"` // 自定义连接查询(默认使用连接查询,主表默认别名为"a")
+	whereMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 替换WHERE条件中字段名(与字段名属性类似)
+	orderMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 替换ORDER排序中的字段名(与字段名属性类似)
+	ident    *hey.Ident        `json:"-" query:"-" form:"-" validate:"-"` // 主表别名信息
+	Result   interface{}       `json:"-" query:"-" form:"-" validate:"-"` // 接收检索结果的对象
+	Total    *int64            `json:"-" query:"-" form:"-" validate:"-"` // 查询到的数据总条数
+}
+
+func NewGetQuery() GetQuery {
+	return &getQuery{}
+}
+
+func (s *getQuery) SetFieldMap(fieldMap map[string]string) GetQuery {
+	s.fieldMap = fieldMap
+	return s
+}
+
+func (s *getQuery) GetFieldMap() map[string]string {
+	return s.fieldMap
+}
+
+func (s *getQuery) AddFieldMap(fieldMap map[string]string) GetQuery {
+	return s.SetFieldMap(hey.MergeMap(s.GetFieldMap(), fieldMap))
+}
+
+func (s *getQuery) SetField(field ...string) GetQuery {
+	fields := strings.Join(field, ",")
+	s.Field = &fields
+	return s
+}
+
+func (s *getQuery) GetField() []string {
+	if s.Field == nil {
+		return nil
+	}
+	fields := strings.Split(*s.Field, ",")
+	fieldMap := s.GetFieldMap()
+	if fieldMap == nil {
+		return fields
+	}
+	for k, v := range fields {
+		if tmp, ok := fieldMap[v]; ok {
+			fields[k] = tmp
+		}
+	}
+	return fields
+}
+
+func (s *getQuery) AddField(field ...string) GetQuery {
+	if s.Field != nil {
+		return s
+	}
+	return s.SetField(field...)
+}
+
+func (s *getQuery) SetJoins(joins ...*hey.GetJoin) GetQuery {
+	s.joins = joins
+	return s
+}
+
+func (s *getQuery) GetJoins() []*hey.GetJoin {
+	return s.joins
+}
+
+func (s *getQuery) SetWhereMap(whereMap map[string]string) GetQuery {
+	s.whereMap = whereMap
+	return s
+}
+
+func (s *getQuery) GetWhereMap() map[string]string {
+	return s.whereMap
+}
+
+func (s *getQuery) AddWhereMap(whereMap map[string]string) GetQuery {
+	return s.SetWhereMap(hey.MergeMap(s.GetWhereMap(), whereMap))
+}
+
+func (s *getQuery) SetOrderMap(orderMap map[string]string) GetQuery {
+	s.orderMap = orderMap
+	return s
+}
+
+func (s *getQuery) GetOrderMap() map[string]string {
+	return s.orderMap
+}
+
+func (s *getQuery) GetOrder() string {
+	if s.Order == nil {
+		return ""
+	}
+	return *s.Order
+}
+
+func (s *getQuery) SetLimit(limit int64) GetQuery {
+	s.Limit = limit
+	return s
+}
+
+func (s *getQuery) SetOffset(offset int64) GetQuery {
+	s.Offset = offset
+	return s
+}
+
+func (s *getQuery) IsCount() bool {
+	return s.Count
+}
+
+func (s *getQuery) SetCount(count int64) GetQuery {
+	s.Total = &count
+	return s
+}
+
+func (s *getQuery) GetCount() int64 {
+	if s.Total == nil {
+		return 0
+	}
+	return *s.Total
+}
+
+func (s *getQuery) SetIdent(ident *hey.Ident) GetQuery {
+	s.ident = ident
+	return s
+}
+
+func (s *getQuery) GetIdent() *hey.Ident {
+	return s.ident
+}
+
+func (s *getQuery) Set(result interface{}) GetQuery {
+	s.Result = result
+	return s
+}
+
+func (s *getQuery) Get() interface{} {
+	return s.Result
+}
+
+const (
+	// MaxAddBatch 批量插入允许的最大条数
+	MaxAddBatch = 500
+)
+
+type AdminWebApiRest interface {
+	AdminWebAdd(ctx context.Context, insert interface{}, way ...*hey.Way) error
+	AdminWebDel(ctx context.Context, id string, way ...*hey.Way) error
+	AdminWebMod(ctx context.Context, id string, update interface{}, way ...*hey.Way) error
+	AdminWebGet(ctx context.Context, query GetQuery, way ...*hey.Way) error
+}
+
+func adminWebAdd(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
+	c := rest.Echo4(ctx)
+	if err := c.Bind(req); err != nil {
+		return c.Bad(err)
+	}
+	if err := s.AdminWebAdd(c.Request().Context(), req); err != nil {
+		return c.Fail(err.Error())
+	}
+	return c.Ok()
+}
+
+func adminWebAddBatch(ctx echo.Context, s AdminWebApiRest, req interface{}, fc func() error) error {
+	c := rest.Echo4(ctx)
+	if err := c.Bind(req); err != nil {
+		return c.Bad(err)
+	}
+	if err := fc(); err != nil {
+		return c.Fail(err.Error())
+	}
+	if err := s.AdminWebAdd(c.Request().Context(), req); err != nil {
+		return c.Fail(err.Error())
+	}
+	return c.Ok()
+}
+
+func adminWebDel(ctx echo.Context, s AdminWebApiRest, fcs ...func() error) error {
+	c := rest.Echo4(ctx)
+	for i := len(fcs) - 1; i >= 0; i-- {
+		if fcs[i] != nil {
+			if err := fcs[i](); err != nil {
+				return err
+			}
+		}
+	}
+	if err := s.AdminWebDel(c.Request().Context(), c.QueryParam(hey.Id)); err != nil {
+		return c.Fail(err.Error())
+	}
+	return c.Ok()
+}
+
+func adminWebMod(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
+	c := rest.Echo4(ctx)
+	if err := c.Bind(req); err != nil {
+		return c.Bad(err)
+	}
+	if err := s.AdminWebMod(c.Request().Context(), c.QueryParam(hey.Id), req); err != nil {
+		return c.Fail(err.Error())
+	}
+	return c.Ok()
+}
+
+func adminWebGet(ctx echo.Context, s AdminWebApiRest, req GetQuery) error {
+	c := rest.Echo4(ctx)
+	if err := c.Bind(req); err != nil {
+		return c.Bad(err)
+	}
+	if err := s.AdminWebGet(c.Request().Context(), req); err != nil {
+		return c.Fail(err.Error())
+	}
+	if req.IsCount() {
+		c.Count(req.GetCount())
+	}
+	return c.Data(req.Get()).Ok()
+}
+
+func adminWebEdit(ctx echo.Context, s AdminWebApiRest, edit interface{}) error {
+	c := rest.Echo4(ctx)
+	if err := s.AdminWebMod(c.Request().Context(), c.QueryParam(hey.Id), edit); err != nil {
+		return c.Fail(err.Error())
+	}
+	return c.Ok()
+}

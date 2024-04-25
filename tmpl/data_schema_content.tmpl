@@ -1,0 +1,258 @@
+// hey-template version: {{{.Version}}}
+
+package data
+
+import (
+    "database/sql"
+
+	"github.com/cd365/hey"
+
+	"{{{.PrefixPackage}}}/model"
+)
+
+type {{{.OriginNamePascal}}} struct {
+	tab *model.Hey{{{.OriginNamePascal}}}
+	way hey.WayWriterReader
+}
+
+// New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
+func New{{{.OriginNamePascal}}}(
+	tab *model.Hey{{{.OriginNamePascal}}},
+	way hey.WayWriterReader,
+) *{{{.OriginNamePascal}}} {
+	return &{{{.OriginNamePascal}}}{
+		tab: tab,
+		way: way,
+	}
+}
+
+func (s *{{{.OriginNamePascal}}}) T() *model.Hey{{{.OriginNamePascal}}} {
+    return s.tab
+}
+
+func (s *{{{.OriginNamePascal}}}) W(way ...*hey.Way) *hey.Way {
+	return autoWay(s.way.W(), way...)
+}
+
+func (s *{{{.OriginNamePascal}}}) R(way ...*hey.Way) *hey.Way {
+	return autoWay(s.way.R(), way...)
+}
+
+func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
+	return s.way.R().F(filters...)
+}
+
+func (s *{{{.OriginNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
+	return s.W(way...).Add(s.tab.Table())
+}
+
+func (s *{{{.OriginNamePascal}}}) Del(way ...*hey.Way) *hey.Del {
+	return s.W(way...).Del(s.tab.Table())
+}
+
+func (s *{{{.OriginNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
+	return s.W(way...).Mod(s.tab.Table())
+}
+
+func (s *{{{.OriginNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
+	return s.R(way...).Get(s.tab.Table()).Column(s.tab.Field()...)
+}
+
+func (s *{{{.OriginNamePascal}}}) Table() string {
+    return s.tab.Table()
+}
+
+func (s *{{{.OriginNamePascal}}}) Field() []string {
+    return s.tab.Field()
+}
+
+func (s *{{{.OriginNamePascal}}}) FieldMap() map[string]struct{} {
+	return s.tab.FieldMap()
+}
+
+func (s *{{{.OriginNamePascal}}}) FieldExist(field string) bool {
+    return s.tab.FieldExist(field)
+}
+
+func (s *{{{.OriginNamePascal}}}) CreatedAt() []string {
+	return s.tab.FieldCreatedAt()
+}
+
+func (s *{{{.OriginNamePascal}}}) UpdatedAt() []string {
+	return s.tab.FieldUpdatedAt()
+}
+
+func (s *{{{.OriginNamePascal}}}) DeletedAt() []string {
+	return s.tab.FieldDeletedAt()
+}
+
+func (s *{{{.OriginNamePascal}}}) AddExcept() []string {
+	return s.tab.FieldAutoIncr()
+}
+
+func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
+	result = s.AddExcept()
+	result = append(result, s.tab.FieldCreatedAt()...)
+	return
+}
+
+func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
+	timestamp := s.W(way...).Now().Unix()
+	for _, field := range s.CreatedAt() {
+		add.DefaultFieldValue(field, timestamp)
+	}
+	for _, field := range s.UpdatedAt() {
+		add.DefaultFieldValue(field, timestamp)
+	}
+}
+
+func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
+	timestamp := s.W(way...).Now().Unix()
+	for _, field := range s.UpdatedAt() {
+		mod.DefaultSet(field, timestamp)
+	}
+}
+
+func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
+	result := make([]int, 0)
+	for k, v := range fields {
+		if !s.FieldExist(v) {
+			result = append(result, k)
+		}
+	}
+	return result
+}
+
+func (s *{{{.OriginNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
+	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) { model.HeyTableInsert(s, add, insert)  }, way...)
+}
+
+func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int64, error) {
+	return s.Del(way...).Where(filter).Del()
+}
+
+func (s *{{{.OriginNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
+	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter) {
+        mod.Modify(update) // warn: don't call the Where method here, you should use `w` as a condition
+        w.Filter(filter)
+	}, way...)
+}
+
+func (s *{{{.OriginNamePascal}}}) Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error {
+	tmp := s.Get(way...)
+	get(tmp)
+	return tmp.Query(query)
+}
+
+func (s *{{{.OriginNamePascal}}}) SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error {
+	tmp := s.Get(way...)
+	get(tmp)
+	return tmp.Get(result)
+}
+
+func (s *{{{.OriginNamePascal}}}) Count(filter hey.Filter) (int64, error) {
+	return s.Get().SubQueryGet(s.SelfSubGet(func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}) {
+		get.Where(s.F(filter))
+	}), hey.AliasA).Count()
+}
+
+func (s *{{{.OriginNamePascal}}}) MustInsert(insert interface{}, way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.Insert(insert, way...))
+}
+
+func (s *{{{.OriginNamePascal}}}) MustDelete(filter hey.Filter, way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.Delete(filter, way...))
+}
+
+func (s *{{{.OriginNamePascal}}}) MustUpdate(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.Update(filter, update, way...))
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Add(way...).Except(s.AddExcept()...)
+	fc(tmp, s.tab)
+	s.AddAt(tmp, way...)
+	return tmp.Add()
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(w hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp, w := s.Del(way...), s.F()
+    fc(w, s.tab)
+	return tmp.Where(w).Del()
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter), way ...*hey.Way) (int64, error) {
+	tmp, w := s.Mod(way...).Except(s.ModExcept()...), s.F()
+	fc(tmp, s.tab, w)
+    s.ModAt(tmp, way...)
+	return tmp.Where(w).Mod()
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
+	tmp := s.Get(way...)
+	query(tmp)
+	err = tmp.Get(&result)
+	return
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(func(get *hey.Get) {
+		query(get)
+		get.Limit(1)
+	}, way...)
+	if err != nil {
+		return nil, err
+	}
+	if len(tmp) > 0 {
+		return tmp[0], nil
+	}
+	return nil, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
+	get := s.Get()
+	if query != nil {
+		query(get, s.tab)
+	}
+	return get
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfMustInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.SelfInsert(fc, way...))
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfMustDelete(fc func(w hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
+}
+
+// SelfMustUpdate it is forbidden to call *hey.Mod.Where() method
+func (s *{{{.OriginNamePascal}}}) SelfMustUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter), way ...*hey.Way) error {
+	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfMustGetAll(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if len(tmp) == 0 {
+		return nil, model.ErrNotFound
+	}
+	return tmp, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+	tmp, err := s.SelfGetOne(query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if tmp == nil {
+		return nil, model.ErrNotFound
+	}
+	return tmp, nil
+}
+
+/**
+ * table.field custom method
+ */
+{{{.CustomMethod}}}

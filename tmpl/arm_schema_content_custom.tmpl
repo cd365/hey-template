@@ -1,0 +1,21 @@
+
+// AdminHide
+//
+//	@Summary	{{{.TableComment}}} 删除
+//	@Tags		后台管理.数据表.{{{.TableComment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		id				query		string		    true	"int value, or int1,int2,int3"	1
+//	@Param		Authorization	header		string	true	"authorization value"
+//	@Success	200				{object}	rest.Resp				"-"
+//	@Success	400				{object}	rest.Resp				"-"
+//	@Failure	500				{object}	rest.Resp				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.TableName}}} [delete]
+func (s *{{{.TableNamePascal}}}) AdminDelete(ctx echo.Context) error {
+    mod := make(map[string]interface{})
+    timestamp := s.table.W().Now().Unix()
+    {{{ range $val := .FieldLists -}}}
+    mod["{{{$val}}}"] = timestamp
+    {{{ end -}}}
+	return adminWebEdit(ctx, s, mod)
+}
