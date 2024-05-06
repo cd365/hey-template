@@ -296,10 +296,9 @@ func (s *TmplTableModel) Make() {
 			opts,
 		)
 		if *c.ColumnName == s.table.TableFieldSerial {
-			tmp = fmt.Sprintf("\t%s %s `json:\"%s\" db:\"%s\" validate:\"-\"`",
+			tmp = fmt.Sprintf("\t%s %s `json:\"%s\" db:\"-\" validate:\"-\"`",
 				c.pascal(),
 				c.databaseTypeToGoType(),
-				*c.ColumnName,
 				*c.ColumnName,
 			)
 		}
