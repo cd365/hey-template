@@ -122,7 +122,7 @@ func (s *pgsql) queryColumns(schema string, table *SysTable) (list []*SysColumn,
 			}
 			list[k].ColumnComment = &tmp
 			return
-		}, "SELECT d.description AS column_comment FROM pg_class c, pg_attribute a, pg_type t, pg_description d WHERE ( c.relname = ? AND a.attname = ? AND a.attnum > 0 AND a.attrelid = c.oid AND a.atttypid = t.oid AND d.objoid = a.attrelid AND d.objsubid = a.attnum ) ORDER BY a.attnum ASC LIMIT 1;", table, *v.ColumnName)
+		}, "SELECT d.description AS column_comment FROM pg_class c, pg_attribute a, pg_type t, pg_description d WHERE ( c.relname = ? AND a.attname = ? AND a.attnum > 0 AND a.attrelid = c.oid AND a.atttypid = t.oid AND d.objoid = a.attrelid AND d.objsubid = a.attnum ) ORDER BY a.attnum ASC LIMIT 1;", *table.TableName, *v.ColumnName)
 		if err != nil {
 			return
 		}

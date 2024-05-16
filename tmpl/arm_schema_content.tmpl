@@ -4,13 +4,15 @@ package arm
 
 import (
 	"errors"
+	"github.com/cd365/go1/app/api/restful"
+	"github.com/cd365/hey"
 	"{{{.PrefixPackage}}}/data"
 	"{{{.PrefixPackage}}}/model"
-	_ "{{{.PrefixPackage}}}/structs/rest"
-	"github.com/cd365/hey"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
+
+const _ = restful.CodeSuccess
 
 type {{{.OriginNamePascal}}} struct {
     *ApiRest
@@ -49,9 +51,9 @@ func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
 //	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body param"
-//	@Success	200				{object}	rest.Resp				"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Success	200				{object}	restful.Body				"-"
+//	@Success	400				{object}	restful.Body				"-"
+//	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
 func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
 	req := &model.Add{{{.OriginNamePascal}}}{}
@@ -66,9 +68,9 @@ func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
 //	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body param"
-//	@Success	200				{object}	rest.Resp				"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Success	200				{object}	restful.Body				"-"
+//	@Success	400				{object}	restful.Body				"-"
+//	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/batch [post]
 func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 	req := make([]*model.Add{{{.OriginNamePascal}}}, 0)
@@ -80,7 +82,7 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 	})
 }
 
-// AdminDelete
+// AdminRemove
 //
 //	@Summary	{{{.Comment}}} 永久删除
 //	@Tags		后台管理.数据表.{{{.Comment}}}
@@ -88,9 +90,9 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		id				query		string		    true	"int value, or int1,int2,int3" 1
 //	@Param		Authorization	header		string	true	"authorization value"
-//	@Success	200				{object}	rest.Resp				"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Success	200				{object}	restful.Body				"-"
+//	@Success	400				{object}	restful.Body				"-"
+//	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
 func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 	return adminWebDel(ctx, s)
@@ -105,9 +107,9 @@ func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 //	@Param		id				query		string		        true	"int valid"	1
 //	@Param		Authorization	header		string				true	"authorization value"
 //	@Param		object			body		model.Mod{{{.OriginNamePascal}}}	true	"request body param"
-//	@Success	200				{object}	rest.Resp				"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Success	200				{object}	restful.Body				"-"
+//	@Success	400				{object}	restful.Body				"-"
+//	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
 func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
 	req := &model.Mod{{{.OriginNamePascal}}}{}
@@ -122,15 +124,15 @@ func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		data			query		getQuery	false	"object"
 //	@Param		Authorization	header		string			true	"authorization value"
-//	@Success	200				{object}	rest.Resp{data=[]model.{{{.OriginNamePascal}}}}			"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Success	200				{object}	restful.Body{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	restful.Body				"-"
+//	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
 func (s *{{{.OriginNamePascal}}}) AdminSelect(ctx echo.Context) error {
 	result := make([]*model.{{{.OriginNamePascal}}}, 0)
-	getQuery := NewGetQuery()
-	getQuery.Set(&result)
-	return adminWebGet(ctx, s, getQuery)
+	query := NewGetQuery()
+	query.Set(&result)
+	return adminWebGet(ctx, s, query)
 }
 
 /**

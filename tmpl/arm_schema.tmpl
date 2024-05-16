@@ -4,6 +4,7 @@ package arm
 
 import (
 	"context"
+	"github.com/cd365/go1/app/api/restful/e4"
 	"github.com/cd365/hey"
 	"github.com/labstack/echo/v4"
 	"{{{.PrefixPackage}}}/model"
@@ -191,11 +192,11 @@ type getQuery struct {
 	rest.OfOrder
 	rest.OfLimit
 	rest.OfOffset
-	fieldMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 字段名替换, 可能存在表名前缀或者使用别名的情况, 故使用当前map进行替换 map[传入字段名]真实使用字段名
-	joins    []*hey.GetJoin    `json:"-" query:"-" form:"-" validate:"-"` // 自定义连接查询(默认使用连接查询,主表默认别名为"a")
-	whereMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 替换WHERE条件中字段名(与字段名属性类似)
-	orderMap map[string]string `json:"-" query:"-" form:"-" validate:"-"` // 替换ORDER排序中的字段名(与字段名属性类似)
-	ident    *hey.Ident        `json:"-" query:"-" form:"-" validate:"-"` // 主表别名信息
+	fieldMap map[string]string // 字段名替换, 可能存在表名前缀或者使用别名的情况, 故使用当前map进行替换 map[传入字段名]真实使用字段名
+	joins    []*hey.GetJoin // 自定义连接查询(默认使用连接查询,主表默认别名为"a")
+	whereMap map[string]string // 替换WHERE条件中字段名(与字段名属性类似)
+	orderMap map[string]string // 替换ORDER排序中的字段名(与字段名属性类似)
+	ident    *hey.Ident // 主表别名信息
 	Result   interface{}       `json:"-" query:"-" form:"-" validate:"-"` // 接收检索结果的对象
 	Total    *int64            `json:"-" query:"-" form:"-" validate:"-"` // 查询到的数据总条数
 }
@@ -342,7 +343,7 @@ type AdminWebApiRest interface {
 }
 
 func adminWebAdd(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	if err := c.Bind(req); err != nil {
 		return c.Bad(err)
 	}
@@ -353,7 +354,7 @@ func adminWebAdd(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
 }
 
 func adminWebAddBatch(ctx echo.Context, s AdminWebApiRest, req interface{}, fc func() error) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	if err := c.Bind(req); err != nil {
 		return c.Bad(err)
 	}
@@ -367,7 +368,7 @@ func adminWebAddBatch(ctx echo.Context, s AdminWebApiRest, req interface{}, fc f
 }
 
 func adminWebDel(ctx echo.Context, s AdminWebApiRest, fcs ...func() error) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	for i := len(fcs) - 1; i >= 0; i-- {
 		if fcs[i] != nil {
 			if err := fcs[i](); err != nil {
@@ -382,7 +383,7 @@ func adminWebDel(ctx echo.Context, s AdminWebApiRest, fcs ...func() error) error
 }
 
 func adminWebMod(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	if err := c.Bind(req); err != nil {
 		return c.Bad(err)
 	}
@@ -393,7 +394,7 @@ func adminWebMod(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
 }
 
 func adminWebGet(ctx echo.Context, s AdminWebApiRest, req GetQuery) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	if err := c.Bind(req); err != nil {
 		return c.Bad(err)
 	}
@@ -407,7 +408,7 @@ func adminWebGet(ctx echo.Context, s AdminWebApiRest, req GetQuery) error {
 }
 
 func adminWebEdit(ctx echo.Context, s AdminWebApiRest, edit interface{}) error {
-	c := rest.Echo4(ctx)
+	c := ctx.(*e4.C)
 	if err := s.AdminWebMod(c.Request().Context(), c.QueryParam(hey.Id), edit); err != nil {
 		return c.Fail(err.Error())
 	}
