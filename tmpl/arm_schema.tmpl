@@ -4,6 +4,7 @@ package arm
 
 import (
 	"context"
+	"errors"
 	"github.com/cd365/go1/app/api/restful/e4"
 	"github.com/cd365/hey"
 	"github.com/labstack/echo/v4"
@@ -76,9 +77,13 @@ func (s *ApiRest) ids(ids string) []interface{} {
 // AdminWebDel 删除一条或者多条(一条sql)
 func (s *ApiRest) AdminWebDel(ctx context.Context, id string, way ...*hey.Way) error {
 	ids := s.ids(id)
-	if len(ids) == 0 {
-		return nil
-	}
+	length := len(ids)
+    if length == 0 {
+        return nil
+    }
+    if length > MaxBatch {
+        return errors.New("too much data")
+    }
 	if _, err := s.ApiDel(ctx, hey.F().In(hey.Id, ids...), way...); err != nil {
 		return err
 	}
@@ -88,9 +93,13 @@ func (s *ApiRest) AdminWebDel(ctx context.Context, id string, way ...*hey.Way) e
 // AdminWebMod 更新一条或者多条(一条sql)(更新多条时设置相同的字段值)
 func (s *ApiRest) AdminWebMod(ctx context.Context, id string, update interface{}, way ...*hey.Way) error {
 	ids := s.ids(id)
-	if len(ids) == 0 {
-		return nil
-	}
+	length := len(ids)
+    if length == 0 {
+        return nil
+    }
+    if length > MaxBatch {
+        return errors.New("too much data")
+    }
 	if _, err := s.ApiMod(ctx, hey.F().In(hey.Id, ids...), update, way...); err != nil {
 		return err
 	}
@@ -331,8 +340,8 @@ func (s *getQuery) Get() interface{} {
 }
 
 const (
-	// MaxAddBatch 批量插入允许的最大条数
-	MaxAddBatch = 500
+	// MaxBatch 批量操作允许的最大数
+    MaxBatch = 500
 )
 
 type AdminWebApiRest interface {

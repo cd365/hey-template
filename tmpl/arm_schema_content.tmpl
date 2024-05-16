@@ -75,7 +75,7 @@ func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
 func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 	req := make([]*model.Add{{{.OriginNamePascal}}}, 0)
 	return adminWebAddBatch(ctx, s, &req, func() error {
-		if len(req) > MaxAddBatch {
+		if len(req) > MaxBatch {
 			return errors.New("too much data")
 		}
 		return nil
