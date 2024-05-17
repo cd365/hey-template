@@ -9,7 +9,6 @@ import (
 	"github.com/cd365/hey"
 	"github.com/labstack/echo/v4"
 	"{{{.PrefixPackage}}}/model"
-	"{{{.PrefixPackage}}}/structs/rest"
 	"strings"
 )
 
@@ -158,14 +157,14 @@ type GetQuery interface {
 }
 
 type getQuery struct {
-	rest.OfField
-	rest.OfWhere
-	rest.OfMaxId
-	rest.OfMinId
-	rest.OfCount
-	rest.OfOrder
-	rest.OfLimit
-	rest.OfOffset
+	restful.OfField
+	restful.OfWhere
+	restful.OfMaxId
+	restful.OfMinId
+	restful.OfCount
+	restful.OfOrder
+	restful.OfLimit
+	restful.OfOffset
 	fieldMap map[string]string // 字段名替换, 可能存在表名前缀或者使用别名的情况, 故使用当前map进行替换 map[传入字段名]真实使用字段名
 	joins    []*hey.GetJoin // 自定义连接查询(默认使用连接查询,主表默认别名为"a")
 	whereMap map[string]string // 替换WHERE条件中字段名(与字段名属性类似)
@@ -347,7 +346,7 @@ func adminWebAddBatch(ctx echo.Context, s AdminWebApiRest, req interface{}, fc f
 
 func adminWebDel(ctx echo.Context, s AdminWebApiRest, fcs ...func() error) error {
 	c := ctx.(*e4.C)
-    req := rest.OfWhere{}
+    req := &restful.OfWhere{}
     if err := c.Bind(req); err != nil {
         return c.Bad(err)
     }

@@ -12,8 +12,6 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
-const _ = restful.CodeSuccess
-
 type {{{.OriginNamePascal}}} struct {
     *ApiRest
 	table *data.{{{.OriginNamePascal}}}
@@ -88,7 +86,7 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 //	@Tags		后台管理.数据表.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		id				query		string		    true	"int value, or int1,int2,int3" 1
+//	@Param		data			body		restful.OfWhere	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization value"
 //	@Success	200				{object}	restful.Body				"-"
 //	@Success	400				{object}	restful.Body				"-"

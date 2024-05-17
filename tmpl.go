@@ -43,7 +43,4 @@ var (
 
 	//go:embed pgsql/func_drop.sql
 	pgsqlFuncDrop string
-
-	//go:embed tmpl/structs_rest_query.tmpl
-	structRestQuery []byte
 )

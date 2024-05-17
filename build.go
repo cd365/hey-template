@@ -724,15 +724,5 @@ func (s *App) Arm() error {
 		return err
 	}
 
-	{
-		filename = pathJoin(s.OutputDirectory, "structs", "rest", "query.go")
-		if _, err := os.Stat(filename); err == nil {
-			filename = strings.Replace(filename, ".go", ".tmp", 1)
-		}
-		if err := s.WriteFile(bytes.NewBuffer(structRestQuery), filename); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
