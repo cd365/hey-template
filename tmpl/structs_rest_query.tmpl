@@ -1,15 +1,14 @@
 package rest
 
 import (
-	"encoding/hex"
-	"fmt"
-	"reflect"
-	"regexp"
-	"strconv"
-	"strings"
+    "encoding/hex"
+    "errors"
+    "fmt"
+    "regexp"
+    "strconv"
+    "strings"
 
-	"github.com/cd365/hey"
-	"github.com/go-playground/validator/v10"
+    "github.com/cd365/hey"
 )
 
 // OfField 查询字段列表
@@ -19,15 +18,29 @@ type OfField struct {
 
 // OfWhere 检索条件过滤
 type OfWhere struct {
-	Filter *string `json:"filter" query:"filter" form:"filter" validate:"omitempty,min=1,max=8192"` // 条件过滤
+	Filter  *string `json:"filter" query:"filter" form:"filter" validate:"omitempty,min=1,max=8192"` // 条件过滤
+	matched [][][]string
 }
 
-// filterRegexp 列名:[数据类型]条件类型:[条件值]
-// 条件值存在多个使用","分割
-var filterRegexp = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9_]*):([idb]?)([ABC0123456789DEF]{2}):(.*)$`)
+// filterRegexp 列名:[数据类型]条件类型:[条件值] 条件值存在多个使用","分割
+var filterRegexp = regexp.MustCompile(`^([0-9])?(#)?([a-zA-Z][a-zA-Z0-9_]*):([%0-9A-F]*)?$`)
 
-func parseInteger(str string) ([]interface{}, error) {
-	splits := strings.Split(str, ",")
+/*
+number && string && null
+(number) 0: IN (包含=)
+(string) 1: IN (包含=)
+(number) 2: BETWEEN AND
+(number) 3: >
+(number) 4: >=
+(number) 5: <
+(number) 6: <=
+(string) 7: LIKE
+(null) 	 8: IS NULL
+#: 浮点类型
+*/
+
+func integer3(bts []byte) ([]interface{}, error) {
+	splits := strings.Split(string(bts), ",")
 	length := len(splits)
 	result := make([]interface{}, 0, length)
 	for i := 0; i < length; i++ {
@@ -40,8 +53,8 @@ func parseInteger(str string) ([]interface{}, error) {
 	return result, nil
 }
 
-func parseDouble(str string) ([]interface{}, error) {
-	splits := strings.Split(str, ",")
+func double3(bts []byte) ([]interface{}, error) {
+	splits := strings.Split(string(bts), ",")
 	length := len(splits)
 	result := make([]interface{}, 0, length)
 	for i := 0; i < length; i++ {
@@ -54,22 +67,15 @@ func parseDouble(str string) ([]interface{}, error) {
 	return result, nil
 }
 
-func parseBool(str string) ([]interface{}, error) {
-	splits := strings.Split(str, ",")
-	length := len(splits)
-	result := make([]interface{}, 0, length)
-	for i := 0; i < length; i++ {
-		bol, err := strconv.ParseBool(splits[i])
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, bol)
+func number3(bts []byte, floatValue bool) ([]interface{}, error) {
+	if floatValue {
+		return double3(bts)
 	}
-	return result, nil
+	return integer3(bts)
 }
 
-func parseString(str string) []interface{} {
-	splits := strings.Split(str, ",")
+func string3(bts []byte) []interface{} {
+	splits := strings.Split(string(bts), ",")
 	length := len(splits)
 	result := make([]interface{}, 0, length)
 	for i := 0; i < length; i++ {
@@ -78,114 +84,139 @@ func parseString(str string) []interface{} {
 	return result
 }
 
-// GetWhere 解析检索条件 ---> 使用","切割多个被 hex.EncodeToString([]byte(v)) 的字符串, v是满足 filterRegexp 正则表达式的条件字符串
-func (s OfWhere) GetWhere(fieldMap ...map[string]string) (hey.Filter, error) {
+func (s OfWhere) match() error {
+	if s.matched != nil {
+		return nil
+	}
 	if s.Filter == nil || *s.Filter == "" {
+		return nil
+	}
+	queries := strings.Split(*s.Filter, ",")
+	length := len(queries)
+	s.matched = make([][][]string, 0, length)
+	for i := 0; i < length; i++ {
+		item, err := hex.DecodeString(queries[i])
+		if err != nil {
+			return err
+		}
+		tmp := filterRegexp.FindAllStringSubmatch(string(item), -1)
+		if len(tmp) < 5 {
+			continue
+		}
+		s.matched = append(s.matched, tmp)
+	}
+	return nil
+}
+
+var (
+	ErrInvalidFilterValue = errors.New("invalid filter value")
+)
+
+// GetWhere 解析检索条件 ---> 使用","切割多个被 hex.EncodeToString([]byte(v)) 的字符串, v是满足 filterRegexp 正则表达式的条件字符串
+func (s OfWhere) GetWhere(fieldRename ...map[string]string) (hey.Filter, error) {
+	if err := s.match(); err != nil {
+		return nil, err
+	}
+	count := len(s.matched)
+	if count == 0 {
 		return nil, nil
 	}
 
-	length := len(fieldMap)
 	var fields map[string]string
-	for i := length - 1; i >= 0; i-- {
-		if fieldMap[i] != nil {
-			fields = fieldMap[i]
-			break
+	{
+		length := len(fieldRename)
+		for i := 0; i < length; i++ {
+			if fieldRename[i] != nil {
+				if fields == nil {
+					fields = fieldRename[i]
+				} else {
+					for k, v := range fieldRename[i] {
+						fields[k] = v
+					}
+				}
+			}
 		}
 	}
 
 	var err error
-	filters := strings.Split(*s.Filter, ",")
-	for k, v := range filters {
-		if tmp, der := hex.DecodeString(v); der != nil {
-			return nil, der
-		} else {
-			filters[k] = string(tmp)
-		}
-	}
+	var bts []byte
+	var field string         // 字段名
+	var values []interface{} // 字段值
+	var group []string       // [0-9][F]field:[values]
 
 	filter := hey.F()
 
-	for _, v := range filters {
-		match := filterRegexp.FindAllStringSubmatch(v, -1)
-		length = len(match)
-		if length != 1 {
-			continue
-		}
-		matched := match[0]
-		length = len(matched)
-		if length != 5 {
-			continue
-		}
-		field := matched[1]
+	length := len(s.matched)
+loop:
+	for i := 0; i < length; i++ {
+		group = s.matched[i][0]
+		field = group[3]
 		if fields != nil {
 			tmp, ok := fields[field]
 			if !ok {
 				continue
 			}
 			if tmp != "" {
-				field = tmp
+				field = tmp // field name redress
 			}
 		}
-		var values []interface{}
-		switch matched[2] { // 根据 数据类型 解析 数据值
-		case "i": // integer
-			if values, err = parseInteger(matched[4]); err != nil {
+		// 提取参数值列表
+		switch group[1][0] {
+		case '0', '2', '3', '4', '5', '6':
+			if bts, err = hex.DecodeString(group[4]); err != nil {
 				return nil, err
 			}
-		case "d": // double
-			if values, err = parseDouble(matched[4]); err != nil {
+			if values, err = number3(bts, group[2] != ""); err != nil {
 				return nil, err
 			}
-		case "b": // bool
-			if values, err = parseBool(matched[4]); err != nil {
+		case '1', '7':
+			if bts, err = hex.DecodeString(group[4]); err != nil {
 				return nil, err
 			}
-		default: // string
-			values = parseString(matched[4])
-		}
-		// 条件过滤类型
-		switch matched[3] {
-		case "00":
-			filter.IsNull(field)
-		case "01":
-			filter.IsNotNull(field)
-		case "11":
-			if len(values) == 1 {
-				filter.Equal(field, values[0])
-			}
-		case "12":
-			if len(values) == 1 {
-				filter.GreaterEqual(field, values[0])
-			}
-		case "13":
-			if len(values) == 1 {
-				filter.LessThanEqual(field, values[0])
-			}
-		case "14":
-			if len(values) == 1 {
-				filter.NotEqual(field, values[0])
-			}
-		case "15":
-			if len(values) == 1 {
-				filter.Like(field, fmt.Sprintf("%%%s%%", values[0]))
-			}
-		case "16":
-			if len(values) == 1 {
-				filter.NotLike(field, fmt.Sprintf("%%%s%%", values[0]))
-			}
-		case "20":
-			if len(values) == 2 {
-				filter.Between(field, values[0], values[1])
-			}
-		case "21":
-			if len(values) == 2 {
-				filter.NotBetween(field, values[0], values[1])
-			}
-		case "30":
-			filter.In(field, values...)
-		case "31":
-			filter.NotIn(field, values...)
+			values = string3(bts)
+		case '8':
+			values = nil
 		default:
+			continue loop
+		}
+		switch group[1][0] {
+		case '0', '1': // IN || EQUAL
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.In(field, values...)
+		case '2': // BETWEEN AND
+			if len(values) != 2 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.Between(field, values[0], values[1])
+		case '3': // >
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.Greater(field, values[0])
+		case '4': // >=
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.GreaterEqual(field, values[0])
+		case '5': // <
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.LessThan(field, values[0])
+		case '6': // <=
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.LessThanEqual(field, values[0])
+		case '7': // LIKE
+			if len(values) == 0 {
+				return nil, ErrInvalidFilterValue
+			}
+			filter.Like(field, fmt.Sprintf("%%%s%%", values[0]))
+		case '8': // IS NULL
+			filter.IsNull(field)
 		}
 	}
 
@@ -236,52 +267,4 @@ func (s OfOffset) GetOffset() int64 {
 		return 0
 	}
 	return s.Offset
-}
-
-/*
- *
- * 参数验证器
- *
- */
-
-type Validator struct {
-	Validator *validator.Validate
-}
-
-func (s *Validator) Validate(i interface{}) error {
-	return s.Validator.Struct(i)
-}
-
-func NewValidator() (validate *Validator, err error) {
-	validate = &Validator{
-		Validator: validator.New(),
-	}
-
-	/*
-	 * 1. string类型字段非必填时必须要在最前面加 "omitempty"
-	 * 2. []string 要加 "dive" 才会生效
-	 * 3. 有空格的字符串不能使用 "alpha"
-	 * 4. []map[string]string 类型需要使用两个 dive 才能控制 key 和 value 的校验规则
-	 */
-
-	// 自定义校验规则
-
-	// 校验GET请求的query参数order
-	err = validate.Validator.RegisterValidation(
-		"order",
-		func(fl validator.FieldLevel) bool {
-			field := fl.Field()
-			switch field.Kind() {
-			case reflect.String:
-				return regexp.MustCompile(`^([a-zA-Z][A-Za-z0-9_]{0,29}:[ad])(,[a-zA-Z][A-Za-z0-9_]{0,29}:[ad])*$`).MatchString(field.String())
-			default:
-				return false
-			}
-		},
-	)
-	if err != nil {
-		return
-	}
-
-	return
 }

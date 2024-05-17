@@ -98,6 +98,11 @@ func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 	return adminWebDel(ctx, s)
 }
 
+type {{{.OriginNamePascal}}}Update struct {
+	restful.OfWhere
+	*model.ModAuthor
+}
+
 // AdminUpdate
 //
 //	@Summary	{{{.Comment}}} 更新
@@ -106,13 +111,13 @@ func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		id				query		string		        true	"int valid"	1
 //	@Param		Authorization	header		string				true	"authorization value"
-//	@Param		object			body		model.Mod{{{.OriginNamePascal}}}	true	"request body param"
+//	@Param		object			body		{{{.OriginNamePascal}}}Update	true	"request body param"
 //	@Success	200				{object}	restful.Body				"-"
 //	@Success	400				{object}	restful.Body				"-"
 //	@Failure	500				{object}	restful.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
 func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
-	req := &model.Mod{{{.OriginNamePascal}}}{}
+	req := &{{{.OriginNamePascal}}}Update{}
 	return adminWebMod(ctx, s, req)
 }
 

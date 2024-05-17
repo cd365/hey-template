@@ -4,13 +4,12 @@ package arm
 
 import (
 	"context"
-	"errors"
+	"github.com/cd365/go1/app/api/restful"
 	"github.com/cd365/go1/app/api/restful/e4"
 	"github.com/cd365/hey"
 	"github.com/labstack/echo/v4"
 	"{{{.PrefixPackage}}}/model"
 	"{{{.PrefixPackage}}}/structs/rest"
-	"strconv"
 	"strings"
 )
 
@@ -56,51 +55,17 @@ func (s *ApiRest) AdminWebAdd(ctx context.Context, insert interface{}, way ...*h
 	return hey.MustAffectedRows(s.ApiAdd(ctx, insert, way...))
 }
 
-func (s *ApiRest) ids(ids string) []interface{} {
-	ids = strings.ReplaceAll(ids, hey.SqlSpace, hey.EmptyString)
-	sss := strings.Split(ids, ",")
-	length := len(sss)
-	if length == 0 {
-		return nil
-	}
-	result := make([]interface{}, 0, length)
-	for i := 0; i < length; i++ {
-		val, err := strconv.ParseInt(sss[i], 10, 64)
-		if err != nil {
-			return nil
-		}
-		result = append(result, val)
-	}
-	return result
-}
-
 // AdminWebDel 删除一条或者多条(一条sql)
-func (s *ApiRest) AdminWebDel(ctx context.Context, id string, way ...*hey.Way) error {
-	ids := s.ids(id)
-	length := len(ids)
-    if length == 0 {
-        return nil
-    }
-    if length > MaxBatch {
-        return errors.New("too much data")
-    }
-	if _, err := s.ApiDel(ctx, hey.F().In(hey.Id, ids...), way...); err != nil {
+func (s *ApiRest) AdminWebDel(ctx context.Context, filter hey.Filter, way ...*hey.Way) error {
+	if _, err := s.ApiDel(ctx, filter, way...); err != nil {
 		return err
 	}
 	return nil
 }
 
 // AdminWebMod 更新一条或者多条(一条sql)(更新多条时设置相同的字段值)
-func (s *ApiRest) AdminWebMod(ctx context.Context, id string, update interface{}, way ...*hey.Way) error {
-	ids := s.ids(id)
-	length := len(ids)
-    if length == 0 {
-        return nil
-    }
-    if length > MaxBatch {
-        return errors.New("too much data")
-    }
-	if _, err := s.ApiMod(ctx, hey.F().In(hey.Id, ids...), update, way...); err != nil {
+func (s *ApiRest) AdminWebMod(ctx context.Context, filter hey.Filter, update interface{}, way ...*hey.Way) error {
+	if _, err := s.ApiMod(ctx, filter, update, way...); err != nil {
 		return err
 	}
 	return nil
@@ -169,7 +134,7 @@ type GetQuery interface {
 	SetWhereMap(whereMap map[string]string) GetQuery
 	GetWhereMap() map[string]string
 	AddWhereMap(whereMap map[string]string) GetQuery
-	GetWhere(fieldMap ...map[string]string) (hey.Filter, error)
+	GetWhere(fieldRename ...map[string]string) (hey.Filter, error)
 
 	SetOrderMap(orderMap map[string]string) GetQuery
 	GetOrderMap() map[string]string
@@ -344,10 +309,14 @@ const (
     MaxBatch = 500
 )
 
+type AdminWebApiRestWhere interface {
+	GetWhere(fieldRename ...map[string]string) (hey.Filter, error)
+}
+
 type AdminWebApiRest interface {
 	AdminWebAdd(ctx context.Context, insert interface{}, way ...*hey.Way) error
-	AdminWebDel(ctx context.Context, id string, way ...*hey.Way) error
-	AdminWebMod(ctx context.Context, id string, update interface{}, way ...*hey.Way) error
+	AdminWebDel(ctx context.Context, filter hey.Filter, way ...*hey.Way) error
+	AdminWebMod(ctx context.Context, filter hey.Filter, update interface{}, way ...*hey.Way) error
 	AdminWebGet(ctx context.Context, query GetQuery, way ...*hey.Way) error
 }
 
@@ -378,28 +347,46 @@ func adminWebAddBatch(ctx echo.Context, s AdminWebApiRest, req interface{}, fc f
 
 func adminWebDel(ctx echo.Context, s AdminWebApiRest, fcs ...func() error) error {
 	c := ctx.(*e4.C)
-	for i := len(fcs) - 1; i >= 0; i-- {
-		if fcs[i] != nil {
-			if err := fcs[i](); err != nil {
-				return err
-			}
-		}
-	}
-	if err := s.AdminWebDel(c.Request().Context(), c.QueryParam(hey.Id)); err != nil {
-		return c.Fail(err.Error())
-	}
-	return c.Ok()
+    req := rest.OfWhere{}
+    if err := c.Bind(req); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := req.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if tmp, _ := filter.SQL(); tmp == "" {
+        return c.Fail("missing deletion filter")
+    }
+    for i := len(fcs) - 1; i >= 0; i-- {
+        if fcs[i] != nil {
+            if err = fcs[i](); err != nil {
+                return err
+            }
+        }
+    }
+    if err = s.AdminWebDel(c.Request().Context(), filter); err != nil {
+        return c.Fail(err.Error())
+    }
+    return c.Ok()
 }
 
-func adminWebMod(ctx echo.Context, s AdminWebApiRest, req interface{}) error {
+func adminWebMod(ctx echo.Context, s AdminWebApiRest, req AdminWebApiRestWhere) error {
 	c := ctx.(*e4.C)
-	if err := c.Bind(req); err != nil {
-		return c.Bad(err)
-	}
-	if err := s.AdminWebMod(c.Request().Context(), c.QueryParam(hey.Id), req); err != nil {
-		return c.Fail(err.Error())
-	}
-	return c.Ok()
+    if err := c.Bind(req); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := req.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if tmp, _ := filter.SQL(); tmp == "" {
+        return c.Fail("missing update filter")
+    }
+    if err = s.AdminWebMod(c.Request().Context(), filter, req); err != nil {
+        return c.Fail(err.Error())
+    }
+    return c.Ok()
 }
 
 func adminWebGet(ctx echo.Context, s AdminWebApiRest, req GetQuery) error {
@@ -418,7 +405,18 @@ func adminWebGet(ctx echo.Context, s AdminWebApiRest, req GetQuery) error {
 
 func adminWebEdit(ctx echo.Context, s AdminWebApiRest, edit interface{}) error {
 	c := ctx.(*e4.C)
-	if err := s.AdminWebMod(c.Request().Context(), c.QueryParam(hey.Id), edit); err != nil {
+	req := &restful.OfWhere{}
+    if err := c.Bind(req); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := req.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if tmp, _ := filter.SQL(); tmp == "" {
+        return c.Fail("missing update filter")
+    }
+	if err = s.AdminWebMod(c.Request().Context(), filter, edit); err != nil {
 		return c.Fail(err.Error())
 	}
 	return c.Ok()
