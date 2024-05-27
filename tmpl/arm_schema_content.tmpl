@@ -98,7 +98,7 @@ func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 
 type {{{.OriginNamePascal}}}Update struct {
 	restful.OfWhere
-	*model.ModAuthor
+	*model.Mod{{{.OriginNamePascal}}}
 }
 
 // AdminUpdate
