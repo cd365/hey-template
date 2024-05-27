@@ -42,6 +42,10 @@ func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
 	return s.way.R().F(filters...)
 }
 
+func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Filter {
+	return s.F().In(field, values...)
+}
+
 func (s *{{{.OriginNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
 	return s.W(way...).Add(s.tab.Table())
 }
