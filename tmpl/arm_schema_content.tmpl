@@ -3,8 +3,10 @@
 package arm
 
 import (
-	"errors"
+    "context"
+    "github.com/cd365/g"
 	"github.com/cd365/go1/app/api/restful"
+	"github.com/cd365/go1/app/api/restful/e4"
 	"github.com/cd365/hey"
 	"{{{.PrefixPackage}}}/data"
 	"{{{.PrefixPackage}}}/model"
@@ -13,21 +15,30 @@ import (
 )
 
 type {{{.OriginNamePascal}}} struct {
-    *ApiRest
-	table *data.{{{.OriginNamePascal}}}
-	way    hey.WayWriterReader
+    gg  *g.GoGroup
+	way *hey.Way
+	ts  *data.Tables
+	m   *data.{{{.OriginNamePascal}}}
 }
 
 // New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
 func New{{{.OriginNamePascal}}}(
-    table *data.{{{.OriginNamePascal}}},
-	way hey.WayWriterReader,
-) *{{{.OriginNamePascal}}} {
-	return &{{{.OriginNamePascal}}}{
-	    table: table,
-		way  : way,
-		ApiRest: NewApiRest(table),
-	}
+    ctx context.Context,
+    gg *g.GoGroup,
+    way *hey.Way,
+    ts  *data.Tables,
+    m *data.{{{.OriginNamePascal}}},
+) (*{{{.OriginNamePascal}}}, error) {
+	s := &{{{.OriginNamePascal}}}{
+        gg:  gg,
+        way: way,
+        ts:  ts,
+        m:   m,
+    }
+    if err := s.start(ctx); err != nil {
+        return nil, err
+    }
+    return s, nil
 }
 
 // Route register routes
@@ -39,6 +50,7 @@ func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
 	r.PUT("", s.AdminUpdate)
 	r.GET("", s.AdminSelect)
 	{{{.PseudoDelete}}}
+	s.CustomRoute(r)
 }
 
 // AdminInsert
@@ -48,14 +60,27 @@ func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
 //	@Accept		json
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
-//	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body param"
-//	@Success	200				{object}	restful.Body				"-"
-//	@Success	400				{object}	restful.Body				"-"
-//	@Failure	500				{object}	restful.Body				"-"
+//	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body args"
+//	@Success	200				{object}	restful.R				"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
 func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
-	req := &model.Add{{{.OriginNamePascal}}}{}
-	return adminWebAdd(ctx, s, req)
+    c := ctx.(*e4.C)
+    args := &model.Add{{{.OriginNamePascal}}}{}
+    if err := ctx.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    if err := s.AdminInsertBefore(ctx, args); err != nil {
+        return c.FailErr(err)
+    }
+    err := s.m.SelfMustInsert(func(tmp *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) {
+        tmp.Context(ctx.Request().Context()).Except(s.AdminInsertExcept()...).Create(args)
+    })
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
 }
 
 // AdminInsertBatch
@@ -65,19 +90,30 @@ func (s *{{{.OriginNamePascal}}}) AdminInsert(ctx echo.Context) error {
 //	@Accept		json
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
-//	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body param"
-//	@Success	200				{object}	restful.Body				"-"
-//	@Success	400				{object}	restful.Body				"-"
-//	@Failure	500				{object}	restful.Body				"-"
+//	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body args"
+//	@Success	200				{object}	restful.R				"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/batch [post]
 func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
-	req := make([]*model.Add{{{.OriginNamePascal}}}, 0)
-	return adminWebAddBatch(ctx, s, &req, func() error {
-		if len(req) > MaxBatch {
-			return errors.New("too much data")
-		}
-		return nil
-	})
+	c := ctx.(*e4.C)
+    args := make([]*model.Add{{{.OriginNamePascal}}}, 0)
+    if err := ctx.Bind(&args); err != nil {
+        return c.Bad(err)
+    }
+    if len(args) > MaxBatch {
+        return c.Fail("数据量过大")
+    }
+    if err := s.AdminInsertBefore(ctx, args...); err != nil {
+        return c.FailErr(err)
+    }
+    _, err := s.m.SelfInsert(func(tmp *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) {
+        tmp.Context(ctx.Request().Context()).Except(s.AdminInsertExcept()...).Create(args)
+    })
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
 }
 
 // AdminRemove
@@ -87,18 +123,54 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 //	@Accept		json
 //	@Produce	json
 //	@Param		data			body		restful.OfWhere	true	"filter"	1
-//	@Param		Authorization	header		string	true	"authorization value"
-//	@Success	200				{object}	restful.Body				"-"
-//	@Success	400				{object}	restful.Body				"-"
-//	@Failure	500				{object}	restful.Body				"-"
+//	@Param		Authorization	header		string	true	"authorization"
+//	@Success	200				{object}	restful.R				"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
 func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
-	return adminWebDel(ctx, s)
+	c := ctx.(*e4.C)
+    args := &restful.OfWhere{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    if args.Filter == nil {
+        return c.Ok()
+    }
+    filter, err := args.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if filter == nil {
+        return c.Ok()
+    }
+    if where := s.AdminRemoveForbidFilter(); where != nil {
+        had, err := s.m.SelfGetOne(func(get *hey.Get) {
+            get.SubQueryGet(s.m.Get().Where(where), hey.AliasA)
+            get.Where(filter)
+        })
+        if err != nil {
+            return c.FailErr(err)
+        }
+        if had != nil {
+            return c.Fail(s.AdminRemoveForbidFilterMessage())
+        }
+    }
+    if err = s.AdminRemoveBefore(ctx,filter);err != nil {
+        return c.FailErr(err)
+    }
+    _, err = s.m.SelfDelete(func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}) {
+        del.Context(ctx.Request().Context()).Where(filter)
+    })
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
 }
 
-type {{{.OriginNamePascal}}}Update struct {
+type {{{.OriginNamePascal}}}UpdateArgs struct {
 	restful.OfWhere
-	*model.Mod{{{.OriginNamePascal}}}
+	model.Mod{{{.OriginNamePascal}}}
 }
 
 // AdminUpdate
@@ -107,17 +179,114 @@ type {{{.OriginNamePascal}}}Update struct {
 //	@Tags		后台管理.数据表.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		id				query		string		        true	"int valid"	1
-//	@Param		Authorization	header		string				true	"authorization value"
-//	@Param		object			body		{{{.OriginNamePascal}}}Update	true	"request body param"
-//	@Success	200				{object}	restful.Body				"-"
-//	@Success	400				{object}	restful.Body				"-"
-//	@Failure	500				{object}	restful.Body				"-"
+//	@Param		Authorization	header		string				true	"authorization"
+//	@Param		object			body		{{{.OriginNamePascal}}}UpdateArgs	true	"request body args"
+//	@Success	200				{object}	restful.R				"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
 func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
-	req := &{{{.OriginNamePascal}}}Update{}
-	return adminWebMod(ctx, s, req)
+	c := ctx.(*e4.C)
+    args := &{{{.OriginNamePascal}}}UpdateArgs{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    if args.Filter == nil {
+        return c.Ok()
+    }
+    filter, err := args.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if filter == nil {
+        return c.Ok()
+    }
+    if err = s.AdminUpdateBefore(ctx,filter,args);err != nil {
+        return c.FailErr(err)
+    }
+    _, err = s.m.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
+        mod.Context(ctx.Request().Context()).Except(s.AdminUpdateExcept()...).Where(filter).Modify(args.Mod{{{.OriginNamePascal}}})
+    })
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
 }
+
+func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) (*hey.Get, error) {
+	get := s.m.Get(way...).Context(ctx)
+	a := s.way.AliasA()
+
+	get.Alias(a.V())
+
+	query.SetIdent(a)
+	fieldMap := hey.Slice2MapNewVal(s.m.Field(), func(v string) string { return a.V(v) })
+	query.SetFieldMap(fieldMap)
+	query.SetWhereMap(fieldMap)
+	query.SetOrderMap(fieldMap)
+
+	fields := query.GetField()
+	if fields == nil {
+		fields = s.m.Field()
+		hey.SliceIter(func(v string) string { return a.V(v) }, fields)
+	}
+	get.Column(fields...)
+
+	get.Joins(query.GetJoins()...)
+
+	filter, err := query.GetWhere(query.GetWhereMap())
+	if err != nil {
+		return nil, err
+	}
+	get.Where(filter)
+
+	get.Order(query.GetOrder(), query.GetOrderMap())
+	get.Limit(query.GetLimit()).Offset(query.GetOffset())
+	return get, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) AdminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+	get, err := s.adminSelectGet(ctx, query, way...)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.{{{.OriginNamePascal}}}, 0)
+	if query.Count {
+        get.Limit(0)
+        query.Counted, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
+        if err != nil {
+            return nil, err
+        }
+        if query.Counted == 0 {
+            return result, nil
+        }
+        get.Limit(query.GetLimit())
+    }
+	if err = get.Get(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) AdminSelectViewMap(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]map[string]interface{}, error) {
+	get, err := s.adminSelectGet(ctx, query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if query.Count {
+        get.Limit(0)
+        query.Counted, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
+        if err != nil {
+            return nil, err
+        }
+        if query.Counted == 0 {
+            return make([]map[string]interface{}, 0), nil
+        }
+        get.Limit(query.GetLimit())
+    }
+	return get.ViewMap()
+}
+
 
 // AdminSelect
 //
@@ -125,20 +294,29 @@ func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
 //	@Tags		后台管理.数据表.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			query		getQuery	false	"object"
-//	@Param		Authorization	header		string			true	"authorization value"
-//	@Success	200				{object}	restful.Body{data=[]model.{{{.OriginNamePascal}}}}			"-"
-//	@Success	400				{object}	restful.Body				"-"
-//	@Failure	500				{object}	restful.Body				"-"
+//	@Param		data			query		GetQuery	false	"object"
+//	@Param		Authorization	header		string			true	"authorization"
+//	@Success	200				{object}	restful.R{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
 func (s *{{{.OriginNamePascal}}}) AdminSelect(ctx echo.Context) error {
-	result := make([]*model.{{{.OriginNamePascal}}}, 0)
+    c := ctx.(*e4.C)
 	query := NewGetQuery()
-	query.Set(&result)
-	return adminWebGet(ctx, s, query)
+    if err := c.Bind(query); err != nil {
+        return c.Bad(err)
+    }
+    result, err := s.AdminSelectViewMap(ctx.Request().Context(), query)
+    if err != nil {
+        return c.FailErr(err)
+    }
+    if query.Count {
+        c.Count(query.Counted)
+    }
+    return c.Data(result).Ok()
 }
 
 /**
- * table.field custom method
+ * 伪删除和其它自定义方法
  */
 {{{.CustomMethod}}}

@@ -38,6 +38,9 @@ var (
 	//go:embed tmpl/arm_schema_content_custom.tmpl
 	tmplArmSchemaContentCustom []byte
 
+	//go:embed tmpl/arm_schema_content_aaa.tmpl
+	tempArmSchemaCustomAaa []byte
+
 	//go:embed pgsql/func_create.sql
 	pgsqlFuncCreate string
 

@@ -29,7 +29,7 @@ func NewTables(
     return s
 }
 
-func autoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
+func AutoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
 	for i := len(options) - 1; i >= 0; i-- {
 		if options[i] != nil {
 			return options[i]
@@ -57,7 +57,7 @@ func (s *Tables) SLICE() []string {
 func (s *Tables) WRITER(table model.Table, way ...*hey.Way) Writer {
 	return &writer{
 		table: table,
-		way:   autoWay(table.W(), way...),
+		way:   AutoWay(table.Add().Way(), way...),
 	}
 }
 

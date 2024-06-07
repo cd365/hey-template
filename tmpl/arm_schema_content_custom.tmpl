@@ -1,21 +1,42 @@
 
-// AdminHide
+// AdminDelete
 //
 //	@Summary	{{{.TableComment}}} 删除
 //	@Tags		后台管理.数据表.{{{.TableComment}}}
 //	@Accept		json
 //	@Produce	json
 //	@Param		data			body		restful.OfWhere	true	"filter"	1
-//	@Param		Authorization	header		string	true	"authorization value"
-//	@Success	200				{object}	rest.Resp				"-"
-//	@Success	400				{object}	rest.Resp				"-"
-//	@Failure	500				{object}	rest.Resp				"-"
+//	@Param		Authorization	header		string	true	"authorization"
+//	@Success	200				{object}	restful.R				"-"
+//	@Success	400				{object}	restful.R				"-"
+//	@Failure	500				{object}	restful.R				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.TableName}}} [delete]
 func (s *{{{.TableNamePascal}}}) AdminDelete(ctx echo.Context) error {
-    mod := make(map[string]interface{})
-    timestamp := s.table.W().Now().Unix()
+    c := ctx.(*e4.C)
+    modify := make(map[string]interface{})
+    timestamp := s.way.Now().Unix()
     {{{ range $val := .FieldLists -}}}
-    mod["{{{$val}}}"] = timestamp
+    modify["{{{$val}}}"] = timestamp
     {{{ end -}}}
-	return adminWebEdit(ctx, s, mod)
+    args := &restful.OfWhere{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    if args.Filter == nil {
+        return c.Ok()
+    }
+    filter, err := args.GetWhere()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if filter == nil {
+        return c.Ok()
+    }
+    _, err = s.m.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.TableNamePascal}}}) {
+        mod.Context(ctx.Request().Context()).Where(filter).Modify(modify)
+    })
+    if err != nil {
+        return c.Fail(err.Error())
+    }
+    return c.Ok()
 }

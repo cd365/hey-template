@@ -47,7 +47,7 @@ func (s *App) MakeTmplWire(pkg string, customLines ...string) error {
 	suffix := ".go"
 	switch pkg {
 	case "biz":
-		suffix = ".tmpl"
+		suffix = ".tmp"
 	}
 	filename := pathJoin(s.OutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
 	if err := s.WriteFile(text, filename); err != nil {
@@ -561,7 +561,7 @@ func (s *App) Biz() error {
 			return err
 		}
 	}
-	filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmpl")
+	filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmp")
 	bizSchemaBuffer := bytes.NewBuffer(nil)
 	schema.AllTablesSchemaContent = buffer.String()
 	if err := tmpBizSchema.Execute(bizSchemaBuffer, schema); err != nil {
@@ -604,6 +604,8 @@ type TmplTableArm struct {
 	PseudoDelete string // 移动到回收站功能(伪删除)
 
 	CustomMethod string // arm custom methods
+
+	FileNamePrefix string // 文件名前缀
 }
 
 type TmplTableArmPseudoDelete struct {
@@ -678,20 +680,36 @@ func (s *App) Arm() error {
 	for _, table := range tables {
 		tmp := table.TmplTableArm()
 		tmp.UrlPrefix = s.AdminUrlPrefix
+
 		schemaContentBuffer := bytes.NewBuffer(nil)
 		customMethodBuffer, err := tmp.Make()
 		if err != nil {
 			return err
 		}
+
+		// 自定义方法列表(伪删除)
 		tmp.CustomMethod = customMethodBuffer.String()
 		if err = tmpArmSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
 			return err
 		}
+
+		// zzz_table_name.go
 		schemaContentFilename := pathJoin(s.OutputDirectory, "arm", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
-		if _, err = os.Stat(schemaContentFilename); err == nil {
-			schemaContentFilename = strings.Replace(schemaContentFilename, ".go", ".tmp", 1)
-		}
 		if err = s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
+			return err
+		}
+
+		// zzz_table_name_aaa.go 自定义业务代码
+		tmpArmSchemaContentBusinessGo := NewTemplate("arm_schema_content_aaa", tempArmSchemaCustomAaa)
+		tmpArmSchemaContentBusinessGoBuffer := bytes.NewBuffer(nil)
+		if err = tmpArmSchemaContentBusinessGo.Execute(tmpArmSchemaContentBusinessGoBuffer, tmp); err != nil {
+			return err
+		}
+		schemaCustomAaaFilename := pathJoin(s.OutputDirectory, "arm", fmt.Sprintf("%s%s_aaa.go", tableFilenamePrefix, *table.TableName))
+		if _, err = os.Stat(schemaCustomAaaFilename); err == nil {
+			schemaCustomAaaFilename = pathJoin(s.OutputDirectory, "arm", fmt.Sprintf("%s%s_aaa.tmp", tableFilenamePrefix, *table.TableName))
+		}
+		if err = s.WriteFile(tmpArmSchemaContentBusinessGoBuffer, schemaCustomAaaFilename); err != nil {
 			return err
 		}
 	}

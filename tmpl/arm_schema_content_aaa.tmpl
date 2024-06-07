@@ -1,0 +1,91 @@
+// hey-template version: v0.2.0
+// {{{.OriginName}}} {{{.Comment}}} 自定义业务代码
+
+package arm
+
+import (
+    "context"
+	"{{{.PrefixPackage}}}/model"
+	"github.com/cd365/hey"
+	"github.com/labstack/echo/v4"
+)
+
+// AdminInsertExcept 添加时忽略某些业务字段
+func (s *{{{.OriginNamePascal}}}) AdminInsertExcept() []string {
+	return []string{}
+}
+
+// AdminInsertBefore 添加数据之前对业务数据进行校验或业务处理
+func (s *{{{.OriginNamePascal}}}) AdminInsertBefore(ctx echo.Context, add ...*model.Add{{{.OriginNamePascal}}}) error {
+	return nil
+}
+
+// AdminInsertAfter 添加数据之后业务处理
+func (s *{{{.OriginNamePascal}}}) AdminInsertAfter(ctx echo.Context, add ...*model.Add{{{.OriginNamePascal}}}) error {
+	return nil
+}
+
+// AdminRemoveForbidFilter 禁止删除的数据条件
+func (s *{{{.OriginNamePascal}}}) AdminRemoveForbidFilter() hey.Filter {
+	return nil
+}
+
+// AdminRemoveForbidFilterMessage 当客户端删除禁止删除的数据的提示语
+func (s *{{{.OriginNamePascal}}}) AdminRemoveForbidFilterMessage() string {
+	return "无法删除"
+}
+
+// AdminRemoveBefore 删除数据之前业务处理
+func (s *{{{.OriginNamePascal}}}) AdminRemoveBefore(ctx echo.Context, filter hey.Filter) error {
+	return nil
+}
+
+// AdminRemoveAfter 删除数据之后业务处理
+func (s *{{{.OriginNamePascal}}}) AdminRemoveAfter(ctx echo.Context, filter hey.Filter) error {
+	return nil
+}
+
+// AdminUpdateExcept 更新时忽略某些业务字段
+func (s *{{{.OriginNamePascal}}}) AdminUpdateExcept() []string {
+	return []string{}
+}
+
+// AdminUpdateBefore 更新数据之前业务处理
+func (s *{{{.OriginNamePascal}}}) AdminUpdateBefore(ctx echo.Context, filter hey.Filter, update *{{{.OriginNamePascal}}}UpdateArgs) error {
+	return nil
+}
+
+// AdminUpdateAfter 更新数据之后业务处理
+func (s *{{{.OriginNamePascal}}}) AdminUpdateAfter(ctx echo.Context, filter hey.Filter, update *{{{.OriginNamePascal}}}UpdateArgs) error {
+	return nil
+}
+
+// AdminSelectBefore 查询之前的业务处理
+func (s *{{{.OriginNamePascal}}}) AdminSelectBefore(ctx echo.Context, getQuery *GetQuery) error {
+	return nil
+}
+
+// AdminSelectAfter 查询之后的业务处理
+func (s *{{{.OriginNamePascal}}}) AdminSelectAfter(ctx echo.Context, getQuery *GetQuery) error {
+	return nil
+}
+
+// AdminDeleteBefore 伪删除之前的业务处理
+func (s *{{{.OriginNamePascal}}}) AdminDeleteBefore(ctx echo.Context, filter hey.Filter) error {
+	return nil
+}
+
+// AdminDeleteAfter 伪删除之后的业务处理
+func (s *{{{.OriginNamePascal}}}) AdminDeleteAfter(ctx echo.Context, filter hey.Filter) error {
+	return nil
+}
+
+// start 启动自定义服务
+func (s *{{{.OriginNamePascal}}}) start(ctx context.Context) error {
+	return nil // TODO 启动自定义服务
+}
+
+// CustomRoute 注册业务自定义路由
+func (s *{{{.OriginNamePascal}}}) CustomRoute(group *echo.Group) {
+    // TODO 注册自定义路由
+}

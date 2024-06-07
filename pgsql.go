@@ -8,19 +8,19 @@ import (
 	"sync"
 )
 
-type pgsql struct {
+type pgsql1 struct {
 	app    *App
 	tables []*SysTable
 }
 
 func Pgsql(app *App) Ber {
-	return &pgsql{app: app}
+	return &pgsql1{app: app}
 }
 
-func (s *pgsql) QueryAll() (err error) {
+func (s *pgsql1) QueryAll() (err error) {
 	schema := s.app.TablePrefixName
 	prepare := "SELECT table_schema, table_name FROM information_schema.tables WHERE ( table_schema = ? AND table_type = 'BASE TABLE' ) ORDER BY table_name ASC"
-	if err = s.app.way.ScanAll(&s.tables, prepare, schema); err != nil {
+	if err = s.app.way.TakeAll(&s.tables, prepare, schema); err != nil {
 		return
 	}
 	once := &sync.Once{}
@@ -45,7 +45,7 @@ func (s *pgsql) QueryAll() (err error) {
 	return
 }
 
-func (s *pgsql) queryComment(schema string, table *SysTable) (err error) {
+func (s *pgsql1) queryComment(schema string, table *SysTable) (err error) {
 	if table.TableName == nil || schema == "" {
 		return
 	}
@@ -73,7 +73,7 @@ func (s *pgsql) queryComment(schema string, table *SysTable) (err error) {
 	return
 }
 
-func (s *pgsql) queryColumns(schema string, table *SysTable) (list []*SysColumn, err error) {
+func (s *pgsql1) queryColumns(schema string, table *SysTable) (list []*SysColumn, err error) {
 	if schema == "" || table == nil || table.TableName == nil || *table.TableName == "" {
 		return
 	}
@@ -133,13 +133,13 @@ func (s *pgsql) queryColumns(schema string, table *SysTable) (list []*SysColumn,
 	return
 }
 
-func (s *pgsql) AllTable() []*SysTable {
+func (s *pgsql1) AllTable() []*SysTable {
 	return s.tables
 }
 
 var pgSeq = regexp.MustCompile(`^nextval\('([A-Za-z0-9_]+)'::regclass\)$`)
 
-func (s *pgsql) TableDdl(table *SysTable) error {
+func (s *pgsql1) TableDdl(table *SysTable) error {
 	var createSequence string
 	for _, c := range table.Column {
 		if c.ColumnDefault == nil {

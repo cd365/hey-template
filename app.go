@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/cd365/hey/pgsql"
 	"io"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ import (
 )
 
 const (
-	Version = "v0.1.0"
+	Version = "v0.2.0"
 )
 
 type Ber interface {
@@ -94,7 +95,7 @@ func (s *App) initial() error {
 		}
 	case DriverPostgres:
 		s.Identify = `"`
-		s.way = hey.NewWay(conn, hey.WithPrepare(hey.DefaultPgsql.Prepare))
+		s.way = hey.NewWay(conn, hey.WithPrepare(pgsql.Prepare))
 		s.ber = Pgsql(s)
 		if s.TablePrefixName == "" {
 			s.TablePrefixName = "public"
@@ -290,6 +291,7 @@ func (s *SysTable) TmplTableArm() *TmplTableArm {
 		OriginNameCamel:      model.OriginNameCamel,
 		Comment:              model.Comment,
 		PrefixPackage:        s.app.PrefixPackageName,
+		FileNamePrefix:       tableFilenamePrefix,
 	}
 }
 

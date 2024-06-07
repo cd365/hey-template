@@ -1,16 +1,16 @@
 
 type {{{.OriginNamePascal}}} struct {
-    db *data.Tables
-    way hey.WayWriterReader
+    ts  *data.Tables
+    way *hey.Way
 }
 
 // New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
 func New{{{.OriginNamePascal}}}(
-    db *data.Tables,
-    way hey.WayWriterReader,
+    ts  *data.Tables,
+    way *hey.Way,
 ) *{{{.OriginNamePascal}}} {
 	return &{{{.OriginNamePascal}}}{
-	    db: db,
+	    ts:  ts,
 	    way: way,
 	}
 }

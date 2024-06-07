@@ -12,13 +12,13 @@ import (
 
 type {{{.OriginNamePascal}}} struct {
 	tab *model.Hey{{{.OriginNamePascal}}}
-	way hey.WayWriterReader
+	way *hey.Way
 }
 
 // New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
 func New{{{.OriginNamePascal}}}(
 	tab *model.Hey{{{.OriginNamePascal}}},
-	way hey.WayWriterReader,
+	way *hey.Way,
 ) *{{{.OriginNamePascal}}} {
 	return &{{{.OriginNamePascal}}}{
 		tab: tab,
@@ -30,16 +30,8 @@ func (s *{{{.OriginNamePascal}}}) T() *model.Hey{{{.OriginNamePascal}}} {
     return s.tab
 }
 
-func (s *{{{.OriginNamePascal}}}) W(way ...*hey.Way) *hey.Way {
-	return autoWay(s.way.W(), way...)
-}
-
-func (s *{{{.OriginNamePascal}}}) R(way ...*hey.Way) *hey.Way {
-	return autoWay(s.way.R(), way...)
-}
-
 func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
-	return s.way.R().F(filters...)
+	return s.way.F(filters...)
 }
 
 func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Filter {
@@ -47,19 +39,19 @@ func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Fi
 }
 
 func (s *{{{.OriginNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
-	return s.W(way...).Add(s.tab.Table())
+	return AutoWay(s.way, way...).Add(s.tab.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Del(way ...*hey.Way) *hey.Del {
-	return s.W(way...).Del(s.tab.Table())
+	return AutoWay(s.way, way...).Del(s.tab.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
-	return s.W(way...).Mod(s.tab.Table())
+	return AutoWay(s.way, way...).Mod(s.tab.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
-	return s.R(way...).Get(s.tab.Table()).Column(s.tab.Field()...)
+	return AutoWay(s.way, way...).Get(s.tab.Table()).Column(s.tab.Field()...)
 }
 
 func (s *{{{.OriginNamePascal}}}) Table() string {
@@ -101,7 +93,7 @@ func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
 }
 
 func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
-	timestamp := s.W(way...).Now().Unix()
+	timestamp := AutoWay(s.way, way...).Now().Unix()
 	for _, field := range s.CreatedAt() {
 		add.DefaultFieldValue(field, timestamp)
 	}
@@ -111,7 +103,7 @@ func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 }
 
 func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
-	timestamp := s.W(way...).Now().Unix()
+	timestamp := AutoWay(s.way, way...).Now().Unix()
 	for _, field := range s.UpdatedAt() {
 		mod.DefaultSet(field, timestamp)
 	}
@@ -128,7 +120,7 @@ func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
 }
 
 func (s *{{{.OriginNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) { model.HeyTableInsert(s, add, insert)  }, way...)
+	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) { model.HeyTableInsert(s, add, insert) }, way...)
 }
 
 func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int64, error) {
@@ -136,9 +128,8 @@ func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (in
 }
 
 func (s *{{{.OriginNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter) {
-        mod.Modify(update) // warn: don't call the Where method here, you should use `w` as a condition
-        w.Filter(filter)
+	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
+		mod.Modify(update).Where(filter)
 	}, way...)
 }
 
@@ -179,17 +170,17 @@ func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{
 	return tmp.Add()
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(w hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
-	tmp, w := s.Del(way...), s.F()
-    fc(w, s.tab)
-	return tmp.Where(w).Del()
+func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Del(way...)
+	fc(tmp, s.tab)
+	return tmp.Del()
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter), way ...*hey.Way) (int64, error) {
-	tmp, w := s.Mod(way...).Except(s.ModExcept()...), s.F()
-	fc(tmp, s.tab, w)
-    s.ModAt(tmp, way...)
-	return tmp.Where(w).Mod()
+func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+	tmp := s.Mod(way...).Except(s.ModExcept()...)
+	fc(tmp, s.tab)
+	s.ModAt(tmp, way...)
+	return tmp.Mod()
 }
 
 func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
@@ -225,12 +216,11 @@ func (s *{{{.OriginNamePascal}}}) SelfMustInsert(fc func(add *hey.Add, t *model.
 	return hey.MustAffectedRows(s.SelfInsert(fc, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustDelete(fc func(w hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfMustDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
 }
 
-// SelfMustUpdate it is forbidden to call *hey.Mod.Where() method
-func (s *{{{.OriginNamePascal}}}) SelfMustUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}, w hey.Filter), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfMustUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
 }
 
@@ -240,7 +230,7 @@ func (s *{{{.OriginNamePascal}}}) SelfMustGetAll(query func(get *hey.Get), way .
 		return nil, err
 	}
 	if len(tmp) == 0 {
-		return nil, model.ErrNotFound
+		return nil, sql.ErrNoRows
 	}
 	return tmp, nil
 }
@@ -251,12 +241,12 @@ func (s *{{{.OriginNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way .
 		return nil, err
 	}
 	if tmp == nil {
-		return nil, model.ErrNotFound
+		return nil, sql.ErrNoRows
 	}
 	return tmp, nil
 }
 
 /**
- * table.field custom method
+ * table.field custom method(其它自定义方法)
  */
 {{{.CustomMethod}}}
