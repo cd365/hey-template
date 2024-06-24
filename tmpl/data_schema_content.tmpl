@@ -11,27 +11,23 @@ import (
 )
 
 type {{{.OriginNamePascal}}} struct {
-	tab *model.Hey{{{.OriginNamePascal}}}
-	way *hey.Way
+	T *model.Hey{{{.OriginNamePascal}}}
+	W *hey.Way
 }
 
 // New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
 func New{{{.OriginNamePascal}}}(
-	tab *model.Hey{{{.OriginNamePascal}}},
+	table *model.Hey{{{.OriginNamePascal}}},
 	way *hey.Way,
 ) *{{{.OriginNamePascal}}} {
 	return &{{{.OriginNamePascal}}}{
-		tab: tab,
-		way: way,
+		T: table,
+		W: way,
 	}
 }
 
-func (s *{{{.OriginNamePascal}}}) T() *model.Hey{{{.OriginNamePascal}}} {
-    return s.tab
-}
-
 func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
-	return s.way.F(filters...)
+	return s.W.F(filters...)
 }
 
 func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Filter {
@@ -39,61 +35,61 @@ func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Fi
 }
 
 func (s *{{{.OriginNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
-	return AutoWay(s.way, way...).Add(s.tab.Table())
+	return AutoWay(s.W, way...).Add(s.T.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Del(way ...*hey.Way) *hey.Del {
-	return AutoWay(s.way, way...).Del(s.tab.Table())
+	return AutoWay(s.W, way...).Del(s.T.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
-	return AutoWay(s.way, way...).Mod(s.tab.Table())
+	return AutoWay(s.W, way...).Mod(s.T.Table())
 }
 
 func (s *{{{.OriginNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
-	return AutoWay(s.way, way...).Get(s.tab.Table()).Column(s.tab.Field()...)
+	return AutoWay(s.W, way...).Get(s.T.Table()).Column(s.T.Field()...)
 }
 
 func (s *{{{.OriginNamePascal}}}) Table() string {
-    return s.tab.Table()
+    return s.T.Table()
 }
 
-func (s *{{{.OriginNamePascal}}}) Field() []string {
-    return s.tab.Field()
+func (s *{{{.OriginNamePascal}}}) Field(except ...string) []string {
+    return s.T.Field(except...)
 }
 
-func (s *{{{.OriginNamePascal}}}) FieldMap() map[string]struct{} {
-	return s.tab.FieldMap()
+func (s *{{{.OriginNamePascal}}}) FieldMap() map[string]*struct{} {
+	return s.T.FieldMap()
 }
 
 func (s *{{{.OriginNamePascal}}}) FieldExist(field string) bool {
-    return s.tab.FieldExist(field)
+    return s.T.FieldExist(field)
 }
 
 func (s *{{{.OriginNamePascal}}}) CreatedAt() []string {
-	return s.tab.FieldCreatedAt()
+	return s.T.FieldCreatedAt()
 }
 
 func (s *{{{.OriginNamePascal}}}) UpdatedAt() []string {
-	return s.tab.FieldUpdatedAt()
+	return s.T.FieldUpdatedAt()
 }
 
 func (s *{{{.OriginNamePascal}}}) DeletedAt() []string {
-	return s.tab.FieldDeletedAt()
+	return s.T.FieldDeletedAt()
 }
 
 func (s *{{{.OriginNamePascal}}}) AddExcept() []string {
-	return s.tab.FieldAutoIncr()
+	return s.T.FieldAutoIncr()
 }
 
 func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
 	result = s.AddExcept()
-	result = append(result, s.tab.FieldCreatedAt()...)
+	result = append(result, s.T.FieldCreatedAt()...)
 	return
 }
 
 func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
-	timestamp := AutoWay(s.way, way...).Now().Unix()
+	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.CreatedAt() {
 		add.DefaultFieldValue(field, timestamp)
 	}
@@ -103,7 +99,7 @@ func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 }
 
 func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
-	timestamp := AutoWay(s.way, way...).Now().Unix()
+	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.UpdatedAt() {
 		mod.DefaultSet(field, timestamp)
 	}
@@ -165,20 +161,20 @@ func (s *{{{.OriginNamePascal}}}) MustUpdate(filter hey.Filter, update map[strin
 
 func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Add(way...).Except(s.AddExcept()...)
-	fc(tmp, s.tab)
+	fc(tmp, s.T)
 	s.AddAt(tmp, way...)
 	return tmp.Add()
 }
 
 func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Del(way...)
-	fc(tmp, s.tab)
+	fc(tmp, s.T)
 	return tmp.Del()
 }
 
 func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Mod(way...).Except(s.ModExcept()...)
-	fc(tmp, s.tab)
+	fc(tmp, s.T)
 	s.ModAt(tmp, way...)
 	return tmp.Mod()
 }
@@ -207,7 +203,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*h
 func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
 	get := s.Get()
 	if query != nil {
-		query(get, s.tab)
+		query(get, s.T)
 	}
 	return get
 }

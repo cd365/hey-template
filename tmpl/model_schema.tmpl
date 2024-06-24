@@ -9,35 +9,83 @@ import (
 )
 
 type Table interface {
+    // Add INSERT.
     Add(way ...*hey.Way) *hey.Add
+
+    // Del DELETE.
     Del(way ...*hey.Way) *hey.Del
+
+    // Mod UPDATE.
     Mod(way ...*hey.Way) *hey.Mod
+
+    // Get SELECT.
     Get(way ...*hey.Way) *hey.Get
+
+    // Table Get table name.
     Table() string
-    Field() []string
-    FieldMap() map[string]struct{}
+
+    // Field Get a list of fields.
+    Field(except ...string) []string
+
+    // FieldMap Get fields map.
+    FieldMap() map[string]*struct{}
+
+    // FieldExist Does the field exist.
     FieldExist(field string) bool
+
+    // CreatedAt Add timestamp value of fields when INSERT.
     CreatedAt() []string
+
+    // UpdatedAt Add timestamp value of fields when UPDATE.
     UpdatedAt() []string
+
+    // DeletedAt Add timestamp value of fields when DELETE.
     DeletedAt() []string
+
+    // AddExcept List of fields that must be excluded when INSERT.
     AddExcept() []string
+
+    // ModExcept List of fields that must be excluded when UPDATE.
     ModExcept() []string
+
+    // AddAt When INSERT, set the default timestamp.
     AddAt(add *hey.Add, way ...*hey.Way)
+
+    // ModAt When UPDATE, set the default timestamp.
     ModAt(mod *hey.Mod, way ...*hey.Way)
+
+    // NotExistsIndex Get a list of non-existent fields.
     NotExistsIndex(fields []string) []int
-    // Insert the inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct
+
+    // Insert Insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
     Insert(insert interface{}, way ...*hey.Way) (int64, error)
+
+    // Delete Delete data from table.
     Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
-    // Update the object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct
+
+    // Update Delete data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
     Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
+
+    // Select Select data from table.
     Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
+
+    // SelectGet Query data and write the query results to the result object.
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
+
+    // Count Count the total number of data in the current table according to the conditions.
     Count(filter hey.Filter) (int64, error)
+
+    // MustInsert The data must be successfully inserted into the table
     MustInsert(insert interface{}, way ...*hey.Way) error
+
+    // MustDelete Delete at least one row from the table.
     MustDelete(filter hey.Filter, way ...*hey.Way) error
+
+    // MustUpdate Update at least one row of data from the table.
     MustUpdate(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
 }
 
+// HeyTableInsert Set the insert data of the specified table.
 func HeyTableInsert(table Table, add *hey.Add, insert interface{}) {
 	if mp, ok := insert.(map[string]interface{}); ok {
 		for k, v := range mp {
@@ -55,26 +103,4 @@ func HeyTableInsert(table Table, add *hey.Add, insert interface{}) {
 		}
 	}
 	add.FieldsValues(fields, values)
-}
-
-func HeyTableUpdate(table Table, update interface{}, updateExceptFields ...string) map[string]interface{} {
-	exceptMap := make(map[string]struct{})
-	updateExceptFields = append(updateExceptFields, table.ModExcept()...)
-	for _, field := range updateExceptFields {
-		exceptMap[field] = struct{}{}
-	}
-	result, ok := update.(map[string]interface{})
-	if !ok {
-		result = make(map[string]interface{})
-		fields, values := hey.StructModify(update, table.Mod().Way().Tag(), updateExceptFields...)
-		for index, field := range fields {
-			result[field] = values[index]
-		}
-	}
-	for field := range result {
-		if _, ok = exceptMap[field]; ok || !table.FieldExist(field) {
-			delete(result, field)
-		}
-	}
-	return result
 }

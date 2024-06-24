@@ -176,7 +176,7 @@ func (s *TmplTableModel) Make() {
 		for k, v := range fieldAccessMap {
 			fieldAccessMap[k] = strings.Replace(v, ",", ":{},", 1)
 		}
-		s.StructColumnHeyValuesAccessMap = fmt.Sprintf("map[string]struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
+		s.StructColumnHeyValuesAccessMap = fmt.Sprintf("map[string]*struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
 	}
 
 	// ignore columns, for insert and update

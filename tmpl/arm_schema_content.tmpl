@@ -5,7 +5,6 @@ package arm
 import (
     "context"
     "github.com/cd365/g"
-	"github.com/cd365/go1/app/api/restful"
 	"github.com/cd365/go1/app/api/restful/e4"
 	"github.com/cd365/hey"
 	"{{{.PrefixPackage}}}/data"
@@ -122,7 +121,7 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 //	@Tags		后台管理.数据表.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			body		restful.OfWhere	true	"filter"	1
+//	@Param		data			body		OfWhere	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
 //	@Success	200				{object}	restful.R				"-"
 //	@Success	400				{object}	restful.R				"-"
@@ -130,7 +129,7 @@ func (s *{{{.OriginNamePascal}}}) AdminInsertBatch(ctx echo.Context) error {
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
 func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 	c := ctx.(*e4.C)
-    args := &restful.OfWhere{}
+    args := &OfWhere{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
     }
@@ -169,7 +168,7 @@ func (s *{{{.OriginNamePascal}}}) AdminRemove(ctx echo.Context) error {
 }
 
 type {{{.OriginNamePascal}}}UpdateArgs struct {
-	restful.OfWhere
+	OfWhere
 	model.Mod{{{.OriginNamePascal}}}
 }
 
@@ -215,34 +214,34 @@ func (s *{{{.OriginNamePascal}}}) AdminUpdate(ctx echo.Context) error {
 
 func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) (*hey.Get, error) {
 	get := s.m.Get(way...).Context(ctx)
-	a := s.way.AliasA()
+    fields := s.m.Field(s.AdminSelectExceptFields()...)
+    get.Column(fields...)
+    query.SetField(fields...)
 
-	get.Alias(a.V())
+    joins := query.GetJoins()
+    if len(joins) > 0 {
+        a := s.way.AliasA()
+        get.Alias(a.V())
+        query.SetIdent(a)
+        fieldMap := hey.Slice2MapNewVal(fields, func(v string) string { return a.V(v) })
+        query.SetFieldMap(fieldMap)
+        query.SetWhereMap(fieldMap)
+        query.SetOrderMap(fieldMap)
 
-	query.SetIdent(a)
-	fieldMap := hey.Slice2MapNewVal(s.m.Field(), func(v string) string { return a.V(v) })
-	query.SetFieldMap(fieldMap)
-	query.SetWhereMap(fieldMap)
-	query.SetOrderMap(fieldMap)
+        get.Joins(joins...)
+        get.Column(query.GetField()...)
+    }
 
-	fields := query.GetField()
-	if fields == nil {
-		fields = s.m.Field()
-		hey.SliceIter(func(v string) string { return a.V(v) }, fields)
-	}
-	get.Column(fields...)
+    filter, err := query.GetWhere(query.GetWhereMap())
+    if err != nil {
+        return nil, err
+    }
+    get.Where(filter)
 
-	get.Joins(query.GetJoins()...)
-
-	filter, err := query.GetWhere(query.GetWhereMap())
-	if err != nil {
-		return nil, err
-	}
-	get.Where(filter)
-
-	get.Order(query.GetOrder(), query.GetOrderMap())
-	get.Limit(query.GetLimit()).Offset(query.GetOffset())
-	return get, nil
+    get.Order(query.GetOrder(), query.GetOrderMap())
+    get.Limit(query.GetLimit())
+    get.Offset(query.GetOffset())
+    return get, nil
 }
 
 func (s *{{{.OriginNamePascal}}}) AdminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
@@ -251,13 +250,13 @@ func (s *{{{.OriginNamePascal}}}) AdminSelectGet(ctx context.Context, query *Get
 		return nil, err
 	}
 	result := make([]*model.{{{.OriginNamePascal}}}, 0)
-	if query.Count {
+	if query.IsCount {
         get.Limit(0)
-        query.Counted, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
+        query.Count, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
         if err != nil {
             return nil, err
         }
-        if query.Counted == 0 {
+        if query.Count == 0 {
             return result, nil
         }
         get.Limit(query.GetLimit())
@@ -273,13 +272,13 @@ func (s *{{{.OriginNamePascal}}}) AdminSelectViewMap(ctx context.Context, query 
 	if err != nil {
 		return nil, err
 	}
-	if query.Count {
+	if query.IsCount {
         get.Limit(0)
-        query.Counted, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
+        query.Count, err = s.m.Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
         if err != nil {
             return nil, err
         }
-        if query.Counted == 0 {
+        if query.Count == 0 {
             return make([]map[string]interface{}, 0), nil
         }
         get.Limit(query.GetLimit())
@@ -310,8 +309,8 @@ func (s *{{{.OriginNamePascal}}}) AdminSelect(ctx echo.Context) error {
     if err != nil {
         return c.FailErr(err)
     }
-    if query.Count {
-        c.Count(query.Counted)
+    if query.IsCount {
+        c.Count(query.Count)
     }
     return c.Data(result).Ok()
 }

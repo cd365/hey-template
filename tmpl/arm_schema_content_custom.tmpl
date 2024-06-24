@@ -5,7 +5,7 @@
 //	@Tags		后台管理.数据表.{{{.TableComment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			body		restful.OfWhere	true	"filter"	1
+//	@Param		data			body		OfWhere	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
 //	@Success	200				{object}	restful.R				"-"
 //	@Success	400				{object}	restful.R				"-"
@@ -18,7 +18,7 @@ func (s *{{{.TableNamePascal}}}) AdminDelete(ctx echo.Context) error {
     {{{ range $val := .FieldLists -}}}
     modify["{{{$val}}}"] = timestamp
     {{{ end -}}}
-    args := &restful.OfWhere{}
+    args := &OfWhere{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
     }

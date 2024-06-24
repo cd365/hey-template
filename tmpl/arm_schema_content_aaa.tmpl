@@ -1,4 +1,4 @@
-// hey-template version: v0.2.0
+// hey-template version: {{{.Version}}}
 // {{{.OriginName}}} {{{.Comment}}} 自定义业务代码
 
 package arm
@@ -57,6 +57,11 @@ func (s *{{{.OriginNamePascal}}}) AdminUpdateBefore(ctx echo.Context, filter hey
 
 // AdminUpdateAfter 更新数据之后业务处理
 func (s *{{{.OriginNamePascal}}}) AdminUpdateAfter(ctx echo.Context, filter hey.Filter, update *{{{.OriginNamePascal}}}UpdateArgs) error {
+	return nil
+}
+
+// AdminSelectExceptFields 查询数据忽略字段列表
+func (s *{{{.OriginNamePascal}}}) AdminSelectExceptFields() []string {
 	return nil
 }
 
