@@ -57,32 +57,32 @@ type Table interface {
     // NotExistsIndex Get a list of non-existent fields.
     NotExistsIndex(fields []string) []int
 
-    // Insert Insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
+    // Insert For insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
     Insert(insert interface{}, way ...*hey.Way) (int64, error)
 
-    // Delete Delete data from table.
+    // Delete For delete data from table.
     Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
 
-    // Update Delete data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
+    // Update For update data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
     Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
 
-    // Select Select data from table.
+    // Select For select data from table.
     Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
 
-    // SelectGet Query data and write the query results to the result object.
+    // SelectGet For query data and write the query results to the result object.
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
 
-    // Count Count the total number of data in the current table according to the conditions.
+    // Count For count the total number of data in the current table according to the conditions.
     Count(filter hey.Filter) (int64, error)
 
-    // MustInsert The data must be successfully inserted into the table
-    MustInsert(insert interface{}, way ...*hey.Way) error
+    // InsertMust The data must be successfully inserted into the table
+    InsertMust(insert interface{}, way ...*hey.Way) error
 
-    // MustDelete Delete at least one row from the table.
-    MustDelete(filter hey.Filter, way ...*hey.Way) error
+    // DeleteMust Delete at least one row from the table.
+    DeleteMust(filter hey.Filter, way ...*hey.Way) error
 
-    // MustUpdate Update at least one row of data from the table.
-    MustUpdate(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
+    // UpdateMust Update at least one row of data from the table.
+    UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
 }
 
 // HeyTableInsert Set the insert data of the specified table.

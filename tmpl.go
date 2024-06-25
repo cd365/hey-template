@@ -20,8 +20,8 @@ var (
 	//go:embed tmpl/data_schema_content.tmpl
 	tmplDataSchemaContent []byte
 
-	//go:embed tmpl/data_schema_content_custom.tmpl
-	tmplDataSchemaContentCustom []byte
+	//go:embed tmpl/data_schema_content123.tmpl
+	tmplDataSchemaContent123 []byte
 
 	//go:embed tmpl/biz_schema.tmpl
 	tmplBizSchema []byte
@@ -29,17 +29,23 @@ var (
 	//go:embed tmpl/biz_schema_content.tmpl
 	tmplBizSchemaContent []byte
 
-	//go:embed tmpl/arm_schema.tmpl
-	tmplArmSchema []byte
+	//go:embed tmpl/asc_schema.tmpl
+	tmplAscSchema []byte
 
-	//go:embed tmpl/arm_schema_content.tmpl
-	tmplArmSchemaContent []byte
+	//go:embed tmpl/asc_schema_content.tmpl
+	tmplAscSchemaContent []byte
 
-	//go:embed tmpl/arm_schema_content_custom.tmpl
-	tmplArmSchemaContentCustom []byte
+	//go:embed tmpl/asc_schema_content_custom.tmpl
+	tmplAscSchemaContentCustom []byte
 
-	//go:embed tmpl/arm_schema_content_aaa.tmpl
-	tempArmSchemaCustomAaa []byte
+	//go:embed tmpl/asc_schema_content123.tmpl
+	tempAscSchemaCustom123 []byte
+
+	//go:embed tmpl/can_schema.tmpl
+	tmplCanSchema []byte
+
+	//go:embed tmpl/can_schema_content.tmpl
+	tmplCanSchemaContent []byte
 
 	//go:embed pgsql/func_create.sql
 	pgsqlFuncCreate string

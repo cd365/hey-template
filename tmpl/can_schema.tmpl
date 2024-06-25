@@ -1,0 +1,20 @@
+// hey-template version: {{{.Version}}}
+
+package can
+
+import (
+	"github.com/cd365/car/app/db/asc"
+)
+
+func ModuleAutoRegisterRouter(
+	{{{.AutoRegisterRouterParams}}}
+) []asc.AutoRegisterRouter {
+	return []asc.AutoRegisterRouter{
+		{{{.AutoRegisterRouterSlice}}}
+	}
+}
+
+// ++++++++++++++++++++++
+// +++ FOR QUICK COPY +++
+// ++++++++++++++++++++++
+{{{.AutoRegisterRouterParamsCopy}}}

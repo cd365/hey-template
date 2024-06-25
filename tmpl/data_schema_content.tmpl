@@ -3,27 +3,38 @@
 package data
 
 import (
+	"context"
     "database/sql"
 
+	"github.com/cd365/g"
 	"github.com/cd365/hey"
 
 	"{{{.PrefixPackage}}}/model"
 )
 
 type {{{.OriginNamePascal}}} struct {
+	schema *schema
+	gg *g.GoGroup
 	T *model.Hey{{{.OriginNamePascal}}}
 	W *hey.Way
 }
 
 // New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
 func New{{{.OriginNamePascal}}}(
+	ctx context.Context,
+	gg *g.GoGroup,
 	table *model.Hey{{{.OriginNamePascal}}},
 	way *hey.Way,
-) *{{{.OriginNamePascal}}} {
-	return &{{{.OriginNamePascal}}}{
+) (*{{{.OriginNamePascal}}}, error) {
+	s := &{{{.OriginNamePascal}}}{
+		gg: gg,
 		T: table,
 		W: way,
 	}
+	if err := s.ofStart(ctx);err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
@@ -147,15 +158,15 @@ func (s *{{{.OriginNamePascal}}}) Count(filter hey.Filter) (int64, error) {
 	}), hey.AliasA).Count()
 }
 
-func (s *{{{.OriginNamePascal}}}) MustInsert(insert interface{}, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) InsertMust(insert interface{}, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Insert(insert, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) MustDelete(filter hey.Filter, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) DeleteMust(filter hey.Filter, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Delete(filter, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) MustUpdate(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Update(filter, update, way...))
 }
 
@@ -208,19 +219,19 @@ func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.H
 	return get
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfInsertMust(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfInsert(fc, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustGetAll(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetAll(query, way...)
 	if err != nil {
 		return nil, err
@@ -231,7 +242,7 @@ func (s *{{{.OriginNamePascal}}}) SelfMustGetAll(query func(get *hey.Get), way .
 	return tmp, nil
 }
 
-func (s *{{{.OriginNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetOne(query, way...)
 	if err != nil {
 		return nil, err
@@ -241,8 +252,3 @@ func (s *{{{.OriginNamePascal}}}) SelfMustGetOne(query func(get *hey.Get), way .
 	}
 	return tmp, nil
 }
-
-/**
- * table.field custom method(其它自定义方法)
- */
-{{{.CustomMethod}}}

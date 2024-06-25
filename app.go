@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/cd365/hey/pgsql"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,6 +10,8 @@ import (
 	"text/template"
 	"time"
 	"unsafe"
+
+	"github.com/cd365/hey/pgsql"
 
 	"github.com/cd365/hey"
 	_ "github.com/go-sql-driver/mysql"
@@ -30,20 +31,21 @@ type Ber interface {
 type App struct {
 	Version string
 
-	Driver             string // 数据库驱动名称 mysql|postgres
-	DataSourceName     string // 数据源名称 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
-	TablePrefixName    string // 数据库前缀名称 public
-	PrefixPackageName  string // 包导入前缀 main
-	TableMethodByField string // 根据表的字段名创建该表独有的自定义方法
-	TablePrefix        bool   // 表名是否使用前缀
-	FieldSerial        string // 表自动递增字段(只有一个字段自动递增)
-	FieldPrimaryKey    string // 表主键字段列表, 多个","隔开
-	FieldCreatedAt     string // 创建时间戳字段列表, 多个","隔开
-	FieldUpdatedAt     string // 更新时间戳字段列表, 多个","隔开
-	FieldDeletedAt     string // 删除时间戳字段列表, 多个","隔开
-	OutputDirectory    string // 输出路径
-	Admin              bool   // 管理端快速增删改代码
-	AdminUrlPrefix     string // 管理端路由前缀
+	Driver            string // 数据库驱动名称 mysql|postgres
+	DataSourceName    string // 数据源名称 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
+	TablePrefixName   string // 数据库前缀名称 public
+	PrefixPackageName string // 包导入前缀 main
+	TablePrefix       bool   // 表名是否使用前缀
+	FieldSerial       string // 表自动递增字段(只有一个字段自动递增)
+	FieldPrimaryKey   string // 表主键字段列表, 多个","隔开
+	FieldCreatedAt    string // 创建时间戳字段列表, 多个","隔开
+	FieldUpdatedAt    string // 更新时间戳字段列表, 多个","隔开
+	FieldDeletedAt    string // 删除时间戳字段列表, 多个","隔开
+	OutputDirectory   string // 输出路径
+	Admin             bool   // 管理端快速增删改代码
+	AdminUrlPrefix    string // 管理端路由前缀
+	Index             bool   // C端快速增删改代码
+	IndexUrlPrefix    string // C端路由前缀
 
 	Identify string // 数据库标识符号 mysql: ` postgres: "
 
@@ -139,7 +141,10 @@ func (s *App) BuildAll() error {
 	writer = append(writer, s.Data)
 	writer = append(writer, s.Biz)
 	if s.Admin {
-		writer = append(writer, s.Arm)
+		writer = append(writer, s.Asc)
+	}
+	if s.Index && s.Admin {
+		writer = append(writer, s.Can)
 	}
 	for _, w := range writer {
 		if err := w(); err != nil {
@@ -280,9 +285,24 @@ func (s *SysTable) TmplTableBiz() *TmplTableBiz {
 	}
 }
 
-func (s *SysTable) TmplTableArm() *TmplTableArm {
+func (s *SysTable) TmplTableAsc() *TmplTableAsc {
 	model := s.TmplTableModel()
-	return &TmplTableArm{
+	return &TmplTableAsc{
+		table:                s,
+		Version:              model.Version,
+		OriginName:           model.OriginName,
+		OriginNamePascal:     model.OriginNamePascal,
+		OriginNameWithPrefix: model.OriginNameWithPrefix,
+		OriginNameCamel:      model.OriginNameCamel,
+		Comment:              model.Comment,
+		PrefixPackage:        s.app.PrefixPackageName,
+		FileNamePrefix:       tableFilenamePrefix,
+	}
+}
+
+func (s *SysTable) TmplTableCan() *TmplTableCan {
+	model := s.TmplTableModel()
+	return &TmplTableCan{
 		table:                s,
 		Version:              model.Version,
 		OriginName:           model.OriginName,

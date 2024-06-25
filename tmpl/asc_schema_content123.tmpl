@@ -1,0 +1,70 @@
+// hey-template version: {{{.Version}}}
+// {{{.OriginName}}} {{{.Comment}}} 自定义业务代码
+
+package asc
+
+import (
+    "context"
+	"errors"
+	"{{{.PrefixPackage}}}/model"
+	"github.com/cd365/hey"
+	"github.com/labstack/echo/v4"
+)
+
+// ofInsert 添加数据之前对业务数据进行校验或业务处理
+func (s *{{{.OriginNamePascal}}}) ofInsert(ctx echo.Context, add ...*model.Add{{{.OriginNamePascal}}}) error {
+	_, _ = ctx, add
+	return nil
+}
+
+// ofDelete 伪删除之前的业务处理
+func (s *{{{.OriginNamePascal}}}) ofDelete(ctx echo.Context, filter hey.Filter) error {
+	if where := s.m.OfDeleteFilter(); !where.IsEmpty() {
+		if exists, rer := s.m.OfExists(ctx.Request().Context(), s.m.F(where, filter)); rer != nil {
+			return rer
+		} else {
+			if exists {
+				return errors.New(s.m.OfDeleteForbidMsg())
+			}
+		}
+	}
+	return nil
+}
+
+// ofRemove 删除数据之前业务处理
+func (s *{{{.OriginNamePascal}}}) ofRemove(ctx echo.Context, filter hey.Filter) error {
+	if where := s.m.OfDeleteFilter(); !where.IsEmpty() {
+		if exists, rer := s.m.OfExists(ctx.Request().Context(), s.m.F(where, filter)); rer != nil {
+			return rer
+		} else {
+			if exists {
+				return errors.New(s.m.OfDeleteForbidMsg())
+			}
+		}
+	}
+	return nil
+}
+
+// ofUpdate 更新数据之前业务处理
+func (s *{{{.OriginNamePascal}}}) ofUpdate(ctx echo.Context, filter hey.Filter, update *{{{.OriginNamePascal}}}UpdateArgs) error {
+	_, _, _ = ctx, filter, update
+	return nil
+}
+
+// ofSelectIgnoreColumns 查询数据需要忽略的字段列表
+func (s *{{{.OriginNamePascal}}}) ofSelectIgnoreColumns() []string {
+	return []string{}
+}
+
+// ofStart 启动自定义服务
+func (s *{{{.OriginNamePascal}}}) ofStart(ctx context.Context) error {
+	_ = ctx
+	// TODO 启动自定义服务
+	return nil
+}
+
+// ofCustomRoute 注册业务自定义路由
+func (s *{{{.OriginNamePascal}}}) ofCustomRoute(group *echo.Group) {
+	_ = group
+    // TODO 注册自定义路由
+}

@@ -1,0 +1,393 @@
+// hey-template version: {{{.Version}}}
+
+package asc
+
+import (
+    "encoding/hex"
+    "errors"
+    "fmt"
+	"github.com/cd365/hey"
+	"regexp"
+    "strconv"
+	"strings"
+	"github.com/labstack/echo/v4"
+)
+
+const (
+	// MaxBatch 批量操作允许的最大数
+	MaxBatch = 500
+)
+
+// OfField 查询字段列表
+type OfField struct {
+	Field *string `json:"field" query:"field" form:"field" validate:"omitempty,min=1,max=1000"` // 查询字段列表(多个字段使用","分割) [1,1000]
+}
+
+func (s OfField) GetField() []string {
+	if s.Field == nil || *s.Field == "" {
+		return nil
+	}
+	fieldsString := *s.Field
+	if bts, err := hex.DecodeString(*s.Field); err == nil {
+		fieldsString = string(bts)
+	}
+	return strings.Split(fieldsString, ",")
+}
+
+// OfKeyword 搜索关键字
+type OfKeyword struct {
+	Keyword *string `json:"keyword" query:"keyword" form:"keyword" validate:"omitempty,min=1,max=32"` // 检索关键字 [1,32]
+}
+
+func (s OfKeyword) GetKeyword() string {
+	return fmt.Sprintf("%%%s%%", *s.Keyword)
+}
+
+func integer3(bts []byte) ([]interface{}, error) {
+	splits := strings.Split(string(bts), ",")
+	length := len(splits)
+	result := make([]interface{}, 0, length)
+	for i := 0; i < length; i++ {
+		i64, err := strconv.ParseInt(splits[i], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, i64)
+	}
+	return result, nil
+}
+
+func double3(bts []byte) ([]interface{}, error) {
+	splits := strings.Split(string(bts), ",")
+	length := len(splits)
+	result := make([]interface{}, 0, length)
+	for i := 0; i < length; i++ {
+		f64, err := strconv.ParseFloat(splits[i], 64)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, f64)
+	}
+	return result, nil
+}
+
+func number3(bts []byte, floatValue bool) ([]interface{}, error) {
+	if floatValue {
+		return double3(bts)
+	}
+	return integer3(bts)
+}
+
+func string3(bts []byte) []interface{} {
+	splits := strings.Split(string(bts), ",")
+	length := len(splits)
+	result := make([]interface{}, 0, length)
+	for i := 0; i < length; i++ {
+		result = append(result, splits[i])
+	}
+	return result
+}
+
+// OfFilter 检索条件过滤(目前只支持多个条件AND逻辑且每个字段只能使用一次)
+type OfFilter struct {
+	Filter *string `json:"filter" query:"filter" form:"filter" validate:"omitempty,min=1,max=8192"` // 条件过滤 [1,8192]
+}
+
+var (
+	// filterRegexp [数据类型:][条件类型:]字段名:[条件值]
+	// 条件值存在多个使用","分割, 为了防止数据出错,条件值时用16进制的数据
+	filterRegexp = regexp.MustCompile(`^([fs]:)?([0-9]{2}:)?([a-zA-Z][a-zA-Z0-9_]*):([0-9A-Fa-f]*)?$`)
+)
+
+var (
+	ErrInvalidFilterValue = errors.New("invalid filter value")
+)
+
+/*
+数据类型限定:
+-    -> 缺省默认整型 int64
+"f:" -> float64
+"s:" -> string
+
+条件类型控制:
+-   -> 缺省默认使用IN,当值的列表只有一个元素的时候自动使用=
+01: -> NOT IN
+02: -> BETWEEN AND
+03: -> NOT BETWEEN AND
+04: -> >
+05: -> >=
+06: -> <
+06: -> <=
+08: -> LIKE
+09: -> NOT LIKE
+10: -> IS NULL
+11: -> IS NOT NULL
+*/
+
+// match 正则匹配提取过滤条件
+func (s OfFilter) match() ([][][]string, error) {
+	if s.Filter == nil || *s.Filter == "" {
+		return nil, nil
+	}
+	queries := strings.Split(*s.Filter, ",")
+	length := len(queries)
+	matched := make([][][]string, 0, length)
+	for i := 0; i < length; i++ {
+		item, err := hex.DecodeString(queries[i])
+		if err != nil {
+			return nil, err
+		}
+		tmp := filterRegexp.FindAllStringSubmatch(string(item), -1)
+		if tmp == nil {
+			continue
+		}
+		matched = append(matched, tmp)
+	}
+	return matched, nil
+}
+
+// parse 解析过滤条件
+func (s OfFilter) parse() (fields []string, fieldsMap map[string]hey.Filter, err error) {
+	fieldsMap = make(map[string]hey.Filter)
+	matched, err := s.match()
+	if err != nil {
+		return nil, nil, err
+	}
+	count := len(matched)
+	if count == 0 {
+		return nil, nil, nil
+	}
+
+	var bts []byte
+	var field string         // 字段名
+	var values []interface{} // 字段值
+	var group []string       // [SF][0-9]field:[values]
+
+	length := len(matched)
+	for i := 0; i < length; i++ {
+		group = matched[i][0]
+		field = group[3]
+
+		// 提取字段值列表
+		if group[4] != "" {
+			if bts, err = hex.DecodeString(group[4]); err != nil {
+				return nil, nil, err
+			}
+		}
+
+		// 存在字段值
+		if bts != nil {
+			switch group[1] {
+			case "f:": // float64
+				values, err = number3(bts, true)
+				if err != nil {
+					return nil, nil, err
+				}
+			case "s:": // string
+				values = string3(bts)
+			default: // int
+				values, err = number3(bts, false)
+				if err != nil {
+					return nil, nil, err
+				}
+			}
+		}
+		// append filter
+		add := func(field string, filter hey.Filter) {
+			if _, ok := fieldsMap[field]; ok {
+				return
+			}
+			fieldsMap[field] = filter
+			fields = append(fields, field)
+		}
+		// 根据条件运算符 提取参数值列表
+		switch group[2] {
+		default:
+			add(field, hey.F().In(field, values))
+		case "01:":
+			add(field, hey.F().NotIn(field, values))
+		case "02:":
+			if len(values) != 2 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().Between(field, values[0], values[1]))
+		case "03:":
+			if len(values) != 2 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().NotBetween(field, values[0], values[1]))
+		case "04:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().Greater(field, values[0]))
+		case "05:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().GreaterEqual(field, values[0]))
+		case "06:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().LessThan(field, values[0]))
+		case "07:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().LessThanEqual(field, values[0]))
+		case "08:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().Like(field, fmt.Sprintf("%%%s%%", values[0])))
+		case "09:":
+			if len(values) == 0 {
+				return nil, nil, ErrInvalidFilterValue
+			}
+			add(field, hey.F().NotLike(field, fmt.Sprintf("%%%s%%", values[0])))
+		case "10:":
+			add(field, hey.F().IsNull(field))
+		case "11:":
+			add(field, hey.F().IsNotNull(field))
+		}
+	}
+	return fields, fieldsMap, nil
+}
+
+// GetFilter 解析检索条件 ---> 使用","切割多个被 hex.EncodeToString([]byte(v)) 的字符串, v是满足 filterRegexp 正则表达式的条件字符串
+// 设置 fields 可以获取单个或者多个字段的对应条件
+func (s OfFilter) GetFilter(fields ...string) (hey.Filter, error) {
+	fieldsSlice, fieldsMap, err := s.parse()
+	if err != nil {
+		return nil, err
+	}
+
+	filter := hey.F()
+
+	if len(fieldsSlice) == 0 {
+        // 未设置任何过滤条件
+        return filter, nil
+    }
+
+	var fieldsAllow map[string]*struct{}
+	{
+		length := len(fields)
+		for i := 0; i < length; i++ {
+			if fields[i] == "" {
+				continue
+			}
+			if fieldsAllow == nil {
+				fieldsAllow = make(map[string]*struct{})
+			}
+			fieldsAllow[fields[i]] = &struct{}{}
+		}
+	}
+
+	for _, v := range fieldsSlice {
+		if fieldsMap != nil {
+			if _, ok := fieldsMap[v]; !ok {
+				continue
+			}
+		}
+		filter.Filter(fieldsMap[v])
+	}
+
+	return filter, nil
+}
+
+// ReplaceFilterFieldName 替换条件中的字段名(一个条件可能在多个sql语句中使用)
+func ReplaceFilterFieldName(filter hey.Filter, old, new string) hey.Filter {
+	if filter == nil {
+		return filter
+	}
+	old, new = strings.TrimSpace(old), strings.TrimSpace(new)
+	if old == hey.EmptyString || new == hey.EmptyString {
+		return filter
+	}
+	old = fmt.Sprintf("%s%s", old, hey.SqlSpace)
+	new = fmt.Sprintf("%s%s", new, hey.SqlSpace)
+	prepare, args := filter.SQL()
+	if strings.Contains(prepare, old) {
+		prepare = strings.ReplaceAll(prepare, old, new)
+		filter = hey.F().And(prepare, args...)
+	}
+	return filter
+}
+
+// OfCount 统计满足条件的总条数
+type OfCount struct {
+	IsCount bool  `json:"count" query:"count" form:"count" validate:"-"` // 是否统计总条数
+	Count   int64 `json:"-" query:"-" form:"-" validate:"-"`             // 查到的数据总条数
+}
+
+// OfOrder 检索数据排序
+type OfOrder struct {
+	Order *string `json:"order" query:"order" form:"order" validate:"omitempty,min=1,max=255"` // 排序 [1,255]
+}
+
+func (s OfOrder) GetOrder() string {
+	if s.Order == nil || *s.Order == "" {
+		return ""
+	}
+	*s.Order = strings.TrimSpace(*s.Order)
+	if bts, err := hex.DecodeString(*s.Order); err == nil {
+		return string(bts)
+	}
+	return *s.Order
+}
+
+// OfLimitOffset 控制数据列表返回的数据; 如果数据超过offset的最大值,应该考虑使用viewed参数检索分页数据 如: SELECT id, name FROM ( SELECT id, name FROM account WHERE ( id < 5000000 ) ORDER BY id DESC )
+type OfLimitOffset struct {
+	// Limit 检索数据的条数 [1,1000]
+	Limit int64 `json:"limit" query:"limit" form:"limit" validate:"omitempty,min=1,max=1000"`
+
+	// Offset 已读数据的条数 [0,100000] (分页通过设置offset或viewed实现) offset 参数通用
+	Offset *int64 `json:"offset" query:"offset" form:"offset" validate:"omitempty,min=0,max=100000"`
+
+	// Viewed 已读数据的最后一条id或序号 (分页通过设置offset或viewed实现) 当数据量特别大且没有客户端自定义筛选和排序时,应优先考虑使用viewed(提升检索速度)
+	Viewed *string `json:"viewed" query:"viewed" form:"viewed" validate:"omitempty,min=1"`
+}
+
+func (s OfLimitOffset) GetLimit() int64 {
+	if s.Limit <= 0 {
+		return 1
+	}
+	return s.Limit
+}
+
+func (s OfLimitOffset) GetOffset() int64 {
+	if s.Offset == nil || *s.Offset < 0 {
+		return 0
+	}
+	return *s.Offset
+}
+
+func (s OfLimitOffset) GetViewed() *int64 {
+	if s.Viewed == nil {
+		return nil
+	}
+	if i64, err := strconv.ParseInt(*s.Viewed, 10, 64); err == nil {
+		return &i64
+	}
+	return nil
+}
+
+type GetQuery struct {
+	OfField
+	OfFilter
+	OfCount
+	OfOrder
+	OfLimitOffset
+	Joins []*hey.GetJoin `json:"-" query:"-" form:"-" validate:"-"` // 自定义连接查询(默认使用连接查询,主表默认别名为"a")
+}
+
+type AutoRegisterRouter interface {
+	Route(group *echo.Group)
+}
+
+func AutoRegisterEchoRoute(group *echo.Group, registers ...AutoRegisterRouter) {
+	for _, r := range registers {
+		r.Route(group)
+	}
+}

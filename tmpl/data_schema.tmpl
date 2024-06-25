@@ -8,6 +8,32 @@ import (
 	"{{{.PrefixPackage}}}/model"
 )
 
+type schema struct {
+	// insertIgnoreColumns 插入数据需要忽略的字段列表
+	insertIgnoreColumns []string
+	// updateIgnoreColumns 更新数据需要忽略的字段列表
+	updateIgnoreColumns []string
+	// selectIgnoreColumns 查询数据需要忽略的字段列表
+	selectIgnoreColumns []string
+
+	// insertPermitColumns 插入数据允许查询的字段列表
+	insertPermitColumns []string
+	// selectPermitColumns 查询数据允许查询的字段列表
+	selectPermitColumns []string
+
+	// deleteFilter 删除数据的前提条件(删除的数据必须满足当前方法返回的条件)
+	deleteFilter hey.Filter
+	// updateFilter 更新数据的前提条件(更新的数据必须满足当前方法返回的条件)
+	updateFilter hey.Filter
+	// selectFilter 查询数据的前提条件(查询的数据必须满足当前方法返回的条件)
+	selectFilter hey.Filter
+
+	// deleteForbidMsg 删除不允许删除的数据(提示语)
+	deleteForbidMsg string
+	// updateForbidMsg 更新不允许更新的数据(提示语)
+	updateForbidMsg string
+}
+
 type Tables struct {
     tableMap map[string]model.Table
     tableSlice []string
@@ -107,4 +133,46 @@ func (s *writer) Mod(where hey.Filter, modify interface{}, prefix ...func(mod *h
 
 func (s *writer) ModMust(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) error {
 	return hey.MustAffectedRows(s.Mod(where, modify, prefix...))
+}
+
+// MakeSliceMap 提取字段并构建哈希表和哈希表键值切片
+func MakeSliceMap[T any, K comparable](slice []T, key func(v T) K) (keys []K, maps map[K]T) {
+	for _, item := range slice {
+		tmp := key(item)
+		if _, ok := maps[tmp]; ok {
+			continue
+		}
+		if maps == nil {
+			keys = make([]K, 0, 32)
+			maps = make(map[K]T, 32)
+		}
+		maps[tmp] = item
+		keys = append(keys, tmp)
+	}
+	return keys, maps
+}
+
+// MatchAssign 匹配赋值
+func MatchAssign[T any, U any, K comparable](maps map[K]T, slices []U, key func(U) K, assign func(T, U)) {
+	for i := range slices {
+		tmp := key(slices[i])
+		if value, found := maps[tmp]; found {
+			assign(value, slices[i])
+		}
+	}
+}
+
+// QueryAssign 查询数据并匹配赋值
+func QueryAssign[T any, U any, K comparable](maps map[K]T, query func() ([]U, error), key func(v U) K, assign func(a T, b U)) error {
+	slices, err := query()
+	if err != nil {
+		return err
+	}
+	for i := range slices {
+		tmp := key(slices[i])
+		if value, found := maps[tmp]; found {
+			assign(value, slices[i])
+		}
+	}
+	return nil
 }

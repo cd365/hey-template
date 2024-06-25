@@ -1,0 +1,204 @@
+// hey-template version: {{{.Version}}}
+
+// ++++++++++++++++++++++++++++
+// +++ 快速为客户端提供通用接口 +++
+// ++++++++++++++++++++++++++++
+
+package can
+
+import (
+    "context"
+    "github.com/cd365/g"
+	"github.com/cd365/hey"
+	"github.com/cd365/echoes"
+	"{{{.PrefixPackage}}}/asc"
+	"{{{.PrefixPackage}}}/data"
+	"{{{.PrefixPackage}}}/model"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+)
+
+type {{{.OriginNamePascal}}} struct {
+    gg  *g.GoGroup
+    ts  *data.Tables
+	way *hey.Way
+    m   *data.{{{.OriginNamePascal}}}
+}
+
+// New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
+func New{{{.OriginNamePascal}}}(
+    ctx context.Context,
+    gg *g.GoGroup,
+    ts  *data.Tables,
+    way *hey.Way,
+    m *data.{{{.OriginNamePascal}}},
+) (*{{{.OriginNamePascal}}}, error) {
+    _ = ctx
+	s := &{{{.OriginNamePascal}}}{
+        gg:  gg,
+        ts:  ts,
+        way: way,
+        m:   m,
+    }
+    return s, nil
+}
+
+// Route register routes
+func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
+	r := group.Group("/{{{.OriginName}}}", middleware.Recover())
+	r.POST("", s.Insert)
+	r.DELETE("", s.Remove)
+	r.PUT("", s.Update)
+	r.GET("", s.Select)
+}
+
+type {{{.OriginNamePascal}}}InsertArgs struct {
+	*model.Add{{{.OriginNamePascal}}}
+}
+
+// Insert
+//
+//	@Summary	添加
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"token"
+//	@Param		object			body		[]{{{.OriginNamePascal}}}InsertArgs	true	"request body args"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
+func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
+    c := ctx.(*echoes.Ctx)
+	args := make([]*{{{.OriginNamePascal}}}InsertArgs, 0)
+	if err := ctx.Bind(args); err != nil {
+		return c.Bad(err)
+	}
+	if len(args) > asc.MaxBatch {
+		return c.Fail("数据太多")
+	}
+	if err := s.m.OfInsertMust(c.Request().Context(), args); err != nil {
+		return c.FailErr(err)
+	}
+	return c.Ok()
+}
+
+type {{{.OriginNamePascal}}}DeleteArgs struct {
+	asc.OfFilter
+}
+
+// Remove
+//
+//	@Summary	永久删除
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		data			body		{{{.OriginNamePascal}}}DeleteArgs	true	"filter"	1
+//	@Param		Authorization	header		string	true	"authorization"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
+func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
+	c := ctx.(*echoes.Ctx)
+    args := &{{{.OriginNamePascal}}}DeleteArgs{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := args.GetFilter()
+	if err != nil {
+		return c.Bad(err)
+	}
+	if filter == nil || filter.IsEmpty() {
+		return c.Ok()
+	}
+	n, err := s.m.OfDelete(ctx.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Filter(filter)
+	})
+	if err != nil {
+		return c.FailErr(err)
+	}
+	if n == 0 {
+		return c.Fail("删除失败")
+	}
+	return c.Ok()
+}
+
+type {{{.OriginNamePascal}}}UpdateArgs struct {
+    asc.OfFilter
+	model.Mod{{{.OriginNamePascal}}}
+}
+
+// Update
+//
+//	@Summary	更新
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"authorization"
+//	@Param		object			body		{{{.OriginNamePascal}}}UpdateArgs	true	"request body args"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
+func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
+	c := ctx.(*echoes.Ctx)
+    args := &{{{.OriginNamePascal}}}UpdateArgs{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := args.GetFilter()
+	if err != nil {
+		return c.Bad(err)
+	}
+	if filter == nil || filter.IsEmpty() {
+		return c.Ok()
+	}
+	n, err := s.m.OfUpdate(ctx.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Filter(filter)
+	}, args.Mod{{{.OriginNamePascal}}})
+	if err != nil {
+		return c.FailErr(err)
+	}
+	if n == 0 {
+		return c.Fail("更新失败")
+	}
+	return c.Ok()
+}
+
+// Select
+//
+//	@Summary	查询
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		data			query		asc.GetQuery	false	"object"
+//	@Param		Authorization	header		string			true	"authorization"
+//	@Success	200				{object}	echoes.RespBody{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
+func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
+    c := ctx.(*echoes.Ctx)
+	query := &asc.GetQuery{}
+    if err := c.Bind(query); err != nil {
+        return c.Bad(err)
+    }
+    var err error
+	var count int64
+	var result []map[string]interface{}
+	if query.IsCount {
+		count, result, err = s.m.OfCountSelectMap1(ctx.Request().Context(), nil)
+		if err != nil {
+			return c.FailErr(err)
+		}
+		c.Count(count)
+	} else {
+		result, err = s.m.OfSelectMap1(ctx.Request().Context(), nil)
+		if err != nil {
+			return c.FailErr(err)
+		}
+	}
+	return c.Data(result).Ok()
+}
+

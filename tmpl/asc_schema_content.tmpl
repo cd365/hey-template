@@ -1,0 +1,317 @@
+// hey-template version: {{{.Version}}}
+
+// +++++++++++++++++++++++++++++
+// +++ 快速为管理后台提供通用接口 +++
+// +++++++++++++++++++++++++++++
+
+package asc
+
+import (
+    "context"
+    "github.com/cd365/g"
+	"github.com/cd365/hey"
+	"github.com/cd365/echoes"
+	"{{{.PrefixPackage}}}/data"
+	"{{{.PrefixPackage}}}/model"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+)
+
+type {{{.OriginNamePascal}}} struct {
+    gg  *g.GoGroup
+    ts  *data.Tables
+	way *hey.Way
+    m   *data.{{{.OriginNamePascal}}}
+}
+
+// New{{{.OriginNamePascal}}} {{{.OriginName}}} {{{.Comment}}}
+func New{{{.OriginNamePascal}}}(
+    ctx context.Context,
+    gg *g.GoGroup,
+    ts  *data.Tables,
+    way *hey.Way,
+    m *data.{{{.OriginNamePascal}}},
+) (*{{{.OriginNamePascal}}}, error) {
+	s := &{{{.OriginNamePascal}}}{
+        gg:  gg,
+        ts:  ts,
+        way: way,
+        m:   m,
+    }
+    if err := s.ofStart(ctx); err != nil {
+        return nil, err
+    }
+    return s, nil
+}
+
+// Route register routes
+func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
+	r := group.Group("/{{{.OriginName}}}", middleware.Recover())
+	r.POST("", s.Insert)
+	r.POST("/batch", s.InsertBatch)
+	r.DELETE("/remove", s.Remove)
+	r.PUT("", s.Update)
+	r.GET("", s.Select)
+	{{{.PseudoDelete}}}
+	s.ofCustomRoute(r)
+}
+
+// Insert
+//
+//	@Summary	添加
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"token"
+//	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body args"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
+func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
+    c := ctx.(*echoes.Ctx)
+    args := &model.Add{{{.OriginNamePascal}}}{}
+    if err := ctx.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    if err := s.ofInsert(ctx, args); err != nil {
+        return c.FailErr(err)
+    }
+    n, err := s.m.OfInsert(ctx.Request().Context(), args)
+	if err != nil {
+		return c.FailErr(err)
+	}
+	if n == 0 {
+		return c.Fail("新增失败")
+	}
+    return c.Ok()
+}
+
+// InsertBatch
+//
+//	@Summary	批量添加
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"token"
+//	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body args"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/batch [post]
+func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
+	c := ctx.(*echoes.Ctx)
+    args := make([]*model.Add{{{.OriginNamePascal}}}, 0)
+    if err := ctx.Bind(&args); err != nil {
+        return c.Bad(err)
+    }
+    if len(args) > MaxBatch {
+        return c.Fail("数据量过大")
+    }
+    if err := s.ofInsert(ctx, args...); err != nil {
+        return c.FailErr(err)
+    }
+    n, err := s.m.OfInsert(ctx.Request().Context(), args)
+	if err != nil {
+		return c.FailErr(err)
+	}
+	if n == 0 {
+		return c.Fail("批量新增失败")
+	}
+    return c.Ok()
+}
+
+// Remove
+//
+//	@Summary	永久删除
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		data			body		OfFilter	true	"filter"	1
+//	@Param		Authorization	header		string	true	"authorization"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
+func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
+	c := ctx.(*echoes.Ctx)
+    args := &OfFilter{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := args.GetFilter()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if filter == nil || filter.IsEmpty() {
+        return c.Ok()
+    }
+    if err = s.ofRemove(ctx,filter);err != nil {
+        return c.FailErr(err)
+    }
+    _, err = s.m.OfDelete(ctx.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Filter(filter)
+	})
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
+}
+
+type {{{.OriginNamePascal}}}UpdateArgs struct {
+	OfFilter
+	model.Mod{{{.OriginNamePascal}}}
+}
+
+// Update
+//
+//	@Summary	更新
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		Authorization	header		string				true	"authorization"
+//	@Param		object			body		{{{.OriginNamePascal}}}UpdateArgs	true	"request body args"
+//	@Success	200				{object}	echoes.RespBody				"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
+func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
+	c := ctx.(*echoes.Ctx)
+    args := &{{{.OriginNamePascal}}}UpdateArgs{}
+    if err := c.Bind(args); err != nil {
+        return c.Bad(err)
+    }
+    filter, err := args.GetFilter()
+    if err != nil {
+        return c.Bad(err)
+    }
+    if filter == nil || filter.IsEmpty() {
+        return c.Ok()
+    }
+    if err = s.ofUpdate(ctx,filter,args);err != nil {
+        return c.FailErr(err)
+    }
+    _, err = s.m.OfUpdate(c.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Filter(filter)
+	}, args.Mod{{{.OriginNamePascal}}})
+    if err != nil {
+        return c.FailErr(err)
+    }
+    return c.Ok()
+}
+
+func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) (*hey.Get, error) {
+	get := s.m.Get(way...).Context(ctx)
+    selectIgnoreColumns := s.m.OfSelectIgnoreColumns()
+	selectIgnoreColumns = append(selectIgnoreColumns, s.ofSelectIgnoreColumns()...)
+	fields := s.m.Field(selectIgnoreColumns...)
+    get.Column(fields...)
+
+    if len(query.Joins) > 0 {
+        a := s.way.AliasA()
+        get.Alias(a.V())
+        get.Joins(query.Joins...)
+        get = data.AutoWay(s.way, way...).Get().SubQueryGet(get, a.V())
+    }
+
+    getFields := query.GetField()
+    if getFields != nil {
+        get.Column(getFields...)
+    }
+
+    filter, err := query.GetFilter()
+    if err != nil {
+        return nil, err
+    }
+    get.Where(filter)
+    return get, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) adminSelectCount(ctx context.Context, get *hey.Get, way ...*hey.Way) (count int64, err error) {
+	return data.AutoWay(s.way, way...).Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
+}
+
+func (s *{{{.OriginNamePascal}}}) SelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+	get, err := s.adminSelectGet(ctx, query, way...)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]*model.{{{.OriginNamePascal}}}, 0)
+	if query.IsCount {
+        query.Count, err = s.adminSelectCount(ctx, get, way...)
+        if err != nil {
+            return nil, err
+        }
+        if query.Count == 0 {
+            return result, nil
+        }
+    }
+    get.Order(query.GetOrder())
+    get.Limit(query.GetLimit())
+    get.Offset(query.GetOffset())
+	if err = get.Get(&result); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]map[string]interface{}, error) {
+	get, err := s.adminSelectGet(ctx, query, way...)
+	if err != nil {
+		return nil, err
+	}
+	if query.IsCount {
+        query.Count, err = s.adminSelectCount(ctx, get, way...)
+        if err != nil {
+            return nil, err
+        }
+        if query.Count == 0 {
+            return make([]map[string]interface{}, 0), nil
+        }
+    }
+    get.Order(query.GetOrder())
+    get.Limit(query.GetLimit())
+    get.Offset(query.GetOffset())
+	result, err := get.ViewMap()
+    if err != nil {
+        return nil, err
+    }
+    if result == nil {
+        result = make([]map[string]interface{}, 0)
+    }
+    return result, nil
+}
+
+
+// Select
+//
+//	@Summary	查询
+//	@Tags		模板接口.{{{.Comment}}}
+//	@Accept		json
+//	@Produce	json
+//	@Param		data			query		GetQuery	false	"object"
+//	@Param		Authorization	header		string			true	"authorization"
+//	@Success	200				{object}	echoes.RespBody{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	echoes.RespBody				"-"
+//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
+func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
+    c := ctx.(*echoes.Ctx)
+	query := &GetQuery{}
+    if err := c.Bind(query); err != nil {
+        return c.Bad(err)
+    }
+    result, err := s.SelectViewMap(ctx.Request().Context(), query)
+    if err != nil {
+        return c.FailErr(err)
+    }
+    if query.IsCount {
+        c.Count(query.Count)
+    }
+    return c.Data(result).Ok()
+}
+
+/**
+ * 伪删除和其它自定义方法
+ */
+{{{.CustomMethod}}}
