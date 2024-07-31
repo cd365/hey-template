@@ -1,4 +1,5 @@
 // hey-template version: {{{.Version}}}
+// TEMPLATE CODE DO NOT EDIT IT.
 
 package data
 
@@ -40,19 +41,27 @@ type Tables struct {
 	{{{.MapListDefine}}}
 }
 
+var (
+	// ats 方便当前包内某个表的实例对象引用其它表实例,特别是在自定义方法中(all tables)
+	ats *Tables
+)
+
 func NewTables(
 	{{{.MapListParams}}}
 ) *Tables {
-	s := &Tables{
+	tables := &Tables{
 		{{{.MapListAssign}}}
 	}
-	s.tableMap = map[string]model.Table{
+	tables.tableMap = map[string]model.Table{
         {{{.MapListStorage}}}
     }
-    s.tableSlice = []string{
+    tables.tableSlice = []string{
         {{{.MapListSlice}}}
     }
-    return s
+    if ats == nil {
+        ats = tables
+    }
+    return tables
 }
 
 func AutoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {

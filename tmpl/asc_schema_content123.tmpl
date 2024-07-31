@@ -68,3 +68,13 @@ func (s *{{{.OriginNamePascal}}}) ofCustomRoute(group *echo.Group) {
 	_ = group
     // TODO 注册自定义路由
 }
+
+// ++++++++++++++++++++++++++++++++++++++++++
+// +++ 下面你可以新增更多的方法, 以实现实际业务 ++++
+// ++++++++++++++++++++++++++++++++++++++++++
+
+// ForExample for example your custom business
+func (s *{{{.OriginNamePascal}}}) ForExample(ctx echo.Context) error {
+	_ = ctx
+	panic("implement your custom business")
+}

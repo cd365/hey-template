@@ -202,3 +202,16 @@ func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
 	return c.Data(result).Ok()
 }
 
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// +++ 以上为基础CURD模板代码, 以上所有代码可以根据您的业务自行更改 ++++
+// +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+// ++++++++++++++++++++++++++++++++++++++++++
+// +++ 下面你可以新增更多的方法, 以实现实际业务 ++++
+// ++++++++++++++++++++++++++++++++++++++++++
+
+// ForExample for example your custom business
+func (s *{{{.OriginNamePascal}}}) ForExample(ctx echo.Context) error {
+	_ = ctx
+	panic("implement your custom business")
+}
