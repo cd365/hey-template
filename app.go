@@ -143,7 +143,7 @@ func (s *App) BuildAll() error {
 	if s.Admin {
 		writer = append(writer, s.Asc)
 	}
-	if s.Index && s.Admin {
+	if s.Index {
 		writer = append(writer, s.Can)
 	}
 	for _, w := range writer {

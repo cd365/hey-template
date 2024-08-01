@@ -500,20 +500,23 @@ func (s *App) Data() error {
 		return err
 	}
 
-	// abc_schema.go
-	abcSchema := &TmplTableAbcSchema{
-		Version:       s.Version,
-		PrefixPackage: s.PrefixPackageName,
+	if s.Admin || s.Index {
+		// abc_schema.go
+		abcSchema := &TmplTableAbcSchema{
+			Version:       s.Version,
+			PrefixPackage: s.PrefixPackageName,
+		}
+		tmpAbcSchema := NewTemplate("abc_schema", tmplAbcSchema)
+		abcFilename := pathJoin(s.OutputDirectory, "abc", "abc_schema.go")
+		abcBuffer := bytes.NewBuffer(nil)
+		if err := tmpAbcSchema.Execute(abcBuffer, abcSchema); err != nil {
+			return err
+		}
+		if err := s.WriteFile(abcBuffer, abcFilename); err != nil {
+			return err
+		}
 	}
-	tmpAbcSchema := NewTemplate("abc_schema", tmplAbcSchema)
-	abcFilename := pathJoin(s.OutputDirectory, "abc", "abc_schema.go")
-	abcBuffer := bytes.NewBuffer(nil)
-	if err := tmpAbcSchema.Execute(abcBuffer, abcSchema); err != nil {
-		return err
-	}
-	if err := s.WriteFile(abcBuffer, abcFilename); err != nil {
-		return err
-	}
+
 	return nil
 }
 
