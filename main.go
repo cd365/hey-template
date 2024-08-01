@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+var (
+	viewVersion bool
+)
+
 func main() {
 	flag.StringVar(&cmd.Driver, "d", "postgres", "driver name: mysql postgres")                                                       // driver name
 	flag.StringVar(&cmd.DataSourceName, "dsn", "postgres://postgres:112233@localhost:5432/hello?sslmode=disable", "data source name") // data source name; mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
@@ -20,7 +24,18 @@ func main() {
 	flag.StringVar(&cmd.AdminUrlPrefix, "admin-url-prefix", "/api/admin/v1/ts", "admin url prefix")                                   // admin url prefix
 	flag.BoolVar(&cmd.Index, "index", false, "quick insert, delete, update")                                                          // quick insert, delete, update
 	flag.StringVar(&cmd.IndexUrlPrefix, "index-url-prefix", "/api/index/v1/ts", "index url prefix")                                   // admin url prefix
+	flag.BoolVar(&viewVersion, "v", false, "view version")                                                                            // view version
 	flag.Parse()
+
+	if CommitHash != "" {
+		cmd.Version = fmt.Sprintf("%s %s", cmd.Version, CommitHash)
+	}
+
+	if viewVersion {
+		fmt.Println(cmd.Version)
+		return
+	}
+
 	if err := cmd.BuildAll(); err != nil {
 		fmt.Println(err.Error())
 	}

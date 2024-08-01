@@ -22,6 +22,10 @@ const (
 	Version = "v0.3.0"
 )
 
+var (
+	CommitHash = ""
+)
+
 type Ber interface {
 	QueryAll() error
 	AllTable() []*SysTable
