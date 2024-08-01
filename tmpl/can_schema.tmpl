@@ -4,13 +4,13 @@
 package can
 
 import (
-	"github.com/cd365/car/app/db/asc"
+	"github.com/cd365/car/app/db/abc"
 )
 
 func ModuleAutoRegisterRouter(
 	{{{.AutoRegisterRouterParams}}}
-) []asc.AutoRegisterRouter {
-	return []asc.AutoRegisterRouter{
+) []abc.AutoRegisterRouter {
+	return []abc.AutoRegisterRouter{
 		{{{.AutoRegisterRouterSlice}}}
 	}
 }

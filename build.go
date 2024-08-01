@@ -413,9 +413,10 @@ type TmplTableData struct {
 	PrefixPackage string // 包导入前缀
 }
 
-type TmplTableDataCustomMethod struct {
-	TableNamePascal      string // 表名
-	TableFieldNamePascal string // 字段名
+type TmplTableAbcSchema struct {
+	Version string // 模板版本
+
+	PrefixPackage string // 包导入前缀
 }
 
 func (s *App) Data() error {
@@ -498,6 +499,21 @@ func (s *App) Data() error {
 	if err := s.WriteFile(buffer, filename); err != nil {
 		return err
 	}
+
+	// abc_schema.go
+	abcSchema := &TmplTableAbcSchema{
+		Version:       s.Version,
+		PrefixPackage: s.PrefixPackageName,
+	}
+	tmpAbcSchema := NewTemplate("abc_schema", tmplAbcSchema)
+	abcFilename := pathJoin(s.OutputDirectory, "abc", "abc_schema.go")
+	abcBuffer := bytes.NewBuffer(nil)
+	if err := tmpAbcSchema.Execute(abcBuffer, abcSchema); err != nil {
+		return err
+	}
+	if err := s.WriteFile(abcBuffer, abcFilename); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -553,12 +569,6 @@ func (s *App) Biz() error {
 		return err
 	}
 	return nil
-}
-
-type TmplTableAscSchema struct {
-	Version string // 模板版本
-
-	PrefixPackage string // 包导入前缀
 }
 
 type TmplTableAsc struct {
@@ -644,13 +654,7 @@ func (s *App) Asc() error {
 	if err := s.MakeTmplWire("asc"); err != nil {
 		return err
 	}
-	// asc_schema.go
-	tmpAscSchema := NewTemplate("asc_schema", tmplAscSchema)
 	tmpAscSchemaContent := NewTemplate("asc_schema_content", tmplAscSchemaContent)
-	schema := &TmplTableAscSchema{
-		Version:       s.Version,
-		PrefixPackage: s.PrefixPackageName,
-	}
 	tables := s.ber.AllTable()
 	for _, table := range tables {
 		tmp := table.TmplTableAsc()
@@ -690,14 +694,6 @@ func (s *App) Asc() error {
 		if err = s.WriteFile(tmpAscSchemaContentBusinessGoBuffer, schemaCustom123Filename); err != nil {
 			return err
 		}
-	}
-	filename := pathJoin(s.OutputDirectory, "asc", "asc_schema.go")
-	buffer := bytes.NewBuffer(nil)
-	if err := tmpAscSchema.Execute(buffer, schema); err != nil {
-		return err
-	}
-	if err := s.WriteFile(buffer, filename); err != nil {
-		return err
 	}
 
 	return nil

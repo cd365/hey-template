@@ -5,7 +5,7 @@
 //	@Tags		后台管理.数据表.{{{.TableComment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			body		OfFilter	true	"filter"	1
+//	@Param		data			body		abc.OfFilter	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
 //	@Success	200				{object}	echoes.RespBody				"-"
 //	@Success	400				{object}	echoes.RespBody				"-"
@@ -18,7 +18,7 @@ func (s *{{{.TableNamePascal}}}) Delete(ctx echo.Context) error {
     {{{ range $val := .FieldLists -}}}
     modify["{{{$val}}}"] = timestamp
     {{{ end -}}}
-    args := &OfFilter{}
+    args := &abc.OfFilter{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
     }

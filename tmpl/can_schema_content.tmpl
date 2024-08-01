@@ -11,7 +11,7 @@ import (
     "github.com/cd365/g"
 	"github.com/cd365/hey"
 	"github.com/cd365/echoes"
-	"{{{.PrefixPackage}}}/asc"
+	"{{{.PrefixPackage}}}/abc"
 	"{{{.PrefixPackage}}}/data"
 	"{{{.PrefixPackage}}}/model"
 	"github.com/labstack/echo/v4"
@@ -47,7 +47,7 @@ func New{{{.OriginNamePascal}}}(
 func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
 	r := group.Group("/{{{.OriginName}}}", middleware.Recover())
 	r.POST("", s.Insert)
-	r.DELETE("", s.Remove)
+	r.DELETE("", s.Delete)
 	r.PUT("", s.Update)
 	r.GET("", s.Select)
 }
@@ -74,7 +74,7 @@ func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
 	if err := ctx.Bind(args); err != nil {
 		return c.Bad(err)
 	}
-	if len(args) > asc.MaxBatch {
+	if len(args) > abc.MaxBatch {
 		return c.Fail("数据太多")
 	}
 	if err := s.m.OfInsertMust(c.Request().Context(), args); err != nil {
@@ -84,10 +84,10 @@ func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
 }
 
 type {{{.OriginNamePascal}}}DeleteArgs struct {
-	asc.OfFilter
+	abc.OfFilter
 }
 
-// Remove
+// Delete
 //
 //	@Summary	永久删除
 //	@Tags		模板接口.{{{.Comment}}}
@@ -98,8 +98,8 @@ type {{{.OriginNamePascal}}}DeleteArgs struct {
 //	@Success	200				{object}	echoes.RespBody				"-"
 //	@Success	400				{object}	echoes.RespBody				"-"
 //	@Failure	500				{object}	echoes.RespBody				"-"
-//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
-func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
+//	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [delete]
+func (s *{{{.OriginNamePascal}}}) Delete(ctx echo.Context) error {
 	c := ctx.(*echoes.Ctx)
     args := &{{{.OriginNamePascal}}}DeleteArgs{}
     if err := c.Bind(args); err != nil {
@@ -125,7 +125,7 @@ func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
 }
 
 type {{{.OriginNamePascal}}}UpdateArgs struct {
-    asc.OfFilter
+    abc.OfFilter
 	model.Mod{{{.OriginNamePascal}}}
 }
 
@@ -172,7 +172,7 @@ func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
 //	@Tags		模板接口.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			query		asc.GetQuery	false	"object"
+//	@Param		data			query		abc.GetQuery	false	"object"
 //	@Param		Authorization	header		string			true	"authorization"
 //	@Success	200				{object}	echoes.RespBody{data=[]model.{{{.OriginNamePascal}}}}			"-"
 //	@Success	400				{object}	echoes.RespBody				"-"
@@ -180,7 +180,7 @@ func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
 func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
     c := ctx.(*echoes.Ctx)
-	query := &asc.GetQuery{}
+	query := &abc.GetQuery{}
     if err := c.Bind(query); err != nil {
         return c.Bad(err)
     }

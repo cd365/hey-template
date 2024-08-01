@@ -29,8 +29,8 @@ var (
 	//go:embed tmpl/biz_schema_content.tmpl
 	tmplBizSchemaContent []byte
 
-	//go:embed tmpl/asc_schema.tmpl
-	tmplAscSchema []byte
+	//go:embed tmpl/abc_schema.tmpl
+	tmplAbcSchema []byte
 
 	//go:embed tmpl/asc_schema_content.tmpl
 	tmplAscSchemaContent []byte

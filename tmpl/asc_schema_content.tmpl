@@ -12,6 +12,7 @@ import (
     "github.com/cd365/g"
 	"github.com/cd365/hey"
 	"github.com/cd365/echoes"
+	"{{{.PrefixPackage}}}/abc"
 	"{{{.PrefixPackage}}}/data"
 	"{{{.PrefixPackage}}}/model"
 	"github.com/labstack/echo/v4"
@@ -106,7 +107,7 @@ func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
     if err := ctx.Bind(&args); err != nil {
         return c.Bad(err)
     }
-    if len(args) > MaxBatch {
+    if len(args) > abc.MaxBatch {
         return c.Fail("数据量过大")
     }
     if err := s.ofInsert(ctx, args...); err != nil {
@@ -128,7 +129,7 @@ func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
 //	@Tags		模板接口.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			body		OfFilter	true	"filter"	1
+//	@Param		data			body		abc.OfFilter	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
 //	@Success	200				{object}	echoes.RespBody				"-"
 //	@Success	400				{object}	echoes.RespBody				"-"
@@ -136,7 +137,7 @@ func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
 func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
 	c := ctx.(*echoes.Ctx)
-    args := &OfFilter{}
+    args := &abc.OfFilter{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
     }
@@ -160,7 +161,7 @@ func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
 }
 
 type {{{.OriginNamePascal}}}UpdateArgs struct {
-	OfFilter
+	abc.OfFilter
 	model.Mod{{{.OriginNamePascal}}}
 }
 
@@ -201,7 +202,7 @@ func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
     return c.Ok()
 }
 
-func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) (*hey.Get, error) {
+func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *abc.GetQuery, way ...*hey.Way) (*hey.Get, error) {
 	get := s.m.Get(way...).Context(ctx)
     selectIgnoreColumns := s.m.OfSelectIgnoreColumns()
 	selectIgnoreColumns = append(selectIgnoreColumns, s.ofSelectIgnoreColumns()...)
@@ -232,7 +233,7 @@ func (s *{{{.OriginNamePascal}}}) adminSelectCount(ctx context.Context, get *hey
 	return data.AutoWay(s.way, way...).Get().Context(ctx).SubQueryGet(get, hey.AliasA).Count()
 }
 
-func (s *{{{.OriginNamePascal}}}) SelectGet(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelectGet(ctx context.Context, query *abc.GetQuery, way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
 	get, err := s.adminSelectGet(ctx, query, way...)
 	if err != nil {
 		return nil, err
@@ -256,7 +257,7 @@ func (s *{{{.OriginNamePascal}}}) SelectGet(ctx context.Context, query *GetQuery
 	return result, nil
 }
 
-func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *GetQuery, way ...*hey.Way) ([]map[string]interface{}, error) {
+func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *abc.GetQuery, way ...*hey.Way) ([]map[string]interface{}, error) {
 	get, err := s.adminSelectGet(ctx, query, way...)
 	if err != nil {
 		return nil, err
@@ -290,7 +291,7 @@ func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *GetQ
 //	@Tags		模板接口.{{{.Comment}}}
 //	@Accept		json
 //	@Produce	json
-//	@Param		data			query		GetQuery	false	"object"
+//	@Param		data			query		abc.GetQuery	false	"object"
 //	@Param		Authorization	header		string			true	"authorization"
 //	@Success	200				{object}	echoes.RespBody{data=[]model.{{{.OriginNamePascal}}}}			"-"
 //	@Success	400				{object}	echoes.RespBody				"-"
@@ -298,7 +299,7 @@ func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *GetQ
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
 func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
     c := ctx.(*echoes.Ctx)
-	query := &GetQuery{}
+	query := &abc.GetQuery{}
     if err := c.Bind(query); err != nil {
         return c.Bad(err)
     }
