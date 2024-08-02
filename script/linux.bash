@@ -1,6 +1,6 @@
 #!/bin/bash
 
-program=hey-template
+program=$1
 buildTime=$(date +'%Y%m%d%H%M%S')
 commitHash=$(git log --pretty=oneline -n 1 | awk '{print $1}')
 

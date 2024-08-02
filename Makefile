@@ -1,15 +1,15 @@
+program=$(shell /bin/bash ./script/program.bash)
+
 all: fmt linux
 
-program=hey-template
-
 fmt:
-	@./script/fmt.bash
+	./script/fmt.bash
 
 linux:
-	@./script/linux.bash
+	./script/linux.bash ${program}
 
 upx:
-	@upx -9 ${program}
+	upx -9 ${program}
 
 clean:
-	@rm -f ${program}
+	rm -f ${program}
