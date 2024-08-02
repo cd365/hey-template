@@ -27,6 +27,10 @@ func main() {
 	flag.BoolVar(&viewVersion, "v", false, "view version")                                                                            // view version
 	flag.Parse()
 
+	if BuildTime != "" {
+		cmd.Version = fmt.Sprintf("%s %s", cmd.Version, BuildTime)
+	}
+
 	if CommitHash != "" {
 		cmd.Version = fmt.Sprintf("%s %s", cmd.Version, CommitHash)
 	}

@@ -3,10 +3,10 @@ all: fmt linux
 program=hey-template
 
 fmt:
-	@./bash/fmt.bash
+	@./script/fmt.bash
 
 linux:
-	@./bash/linux.bash
+	@./script/linux.bash
 
 upx:
 	@upx -9 ${program}
