@@ -38,68 +38,84 @@ func New{{{.OriginNamePascal}}}(
 	return s, nil
 }
 
+// F create a Filter.
 func (s *{{{.OriginNamePascal}}}) F(filters ...hey.Filter) hey.Filter {
 	return s.W.F(filters...)
 }
 
+// In create a Filter by 'IN' keyword.
 func (s *{{{.OriginNamePascal}}}) In(field string, values ...interface{}) hey.Filter {
 	return s.F().In(field, values...)
 }
 
+// Add new *Add object.
 func (s *{{{.OriginNamePascal}}}) Add(way ...*hey.Way) *hey.Add {
 	return AutoWay(s.W, way...).Add(s.T.Table())
 }
 
+// Del new *Del object.
 func (s *{{{.OriginNamePascal}}}) Del(way ...*hey.Way) *hey.Del {
 	return AutoWay(s.W, way...).Del(s.T.Table())
 }
 
+// Mod new *Mod object.
 func (s *{{{.OriginNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
 	return AutoWay(s.W, way...).Mod(s.T.Table())
 }
 
+// Get new *Get object.
 func (s *{{{.OriginNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
 	return AutoWay(s.W, way...).Get(s.T.Table()).Column(s.T.Field()...)
 }
 
+// Table Get the current instance table name.
 func (s *{{{.OriginNamePascal}}}) Table() string {
     return s.T.Table()
 }
 
+// Field Get the field list of the current table(allow some fields to be ignored).
 func (s *{{{.OriginNamePascal}}}) Field(except ...string) []string {
     return s.T.Field(except...)
 }
 
+// FieldMap Get the field of the current table map.
 func (s *{{{.OriginNamePascal}}}) FieldMap() map[string]*struct{} {
 	return s.T.FieldMap()
 }
 
+// FieldExist Detect whether the current instance exists in a certain field.
 func (s *{{{.OriginNamePascal}}}) FieldExist(field string) bool {
     return s.T.FieldExist(field)
 }
 
+// CreatedAt Insert timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) CreatedAt() []string {
 	return s.T.FieldCreatedAt()
 }
 
+// UpdatedAt Update timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) UpdatedAt() []string {
 	return s.T.FieldUpdatedAt()
 }
 
+// DeletedAt Delete timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) DeletedAt() []string {
 	return s.T.FieldDeletedAt()
 }
 
+// AddExcept List of fields to insert data to be ignored.
 func (s *{{{.OriginNamePascal}}}) AddExcept() []string {
 	return s.T.FieldAutoIncr()
 }
 
+// ModExcept List of fields to update data to be ignored.
 func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
 	result = s.AddExcept()
 	result = append(result, s.T.FieldCreatedAt()...)
 	return
 }
 
+// AddAt Set the default timestamp when inserting the data.
 func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.CreatedAt() {
@@ -110,6 +126,7 @@ func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 	}
 }
 
+// ModAt Set the default timestamp when updating the data.
 func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
 	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.UpdatedAt() {
@@ -117,6 +134,7 @@ func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
 	}
 }
 
+// NotExistsIndex Get the field index list that does not exist in the current instance in fields.
 func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
 	result := make([]int, 0)
 	for k, v := range fields {
@@ -127,50 +145,78 @@ func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
 	return result
 }
 
+// Exists Check whether the data exists.
+func (s *{{{.OriginNamePascal}}}) Exists(fc func(get *hey.Get, f hey.Filter), way ...*hey.Way) (bool, error) {
+	query := s.Get(way...)
+	filter := s.F()
+	if fc != nil {
+		fc(query, filter)
+	}
+	return query.Where(filter).Limit(1).Exists()
+}
+
+// Insert Quickly insert data.
 func (s *{{{.OriginNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
 	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) { model.HeyTableInsert(s, add, insert) }, way...)
 }
 
+// Delete Quickly delete data.
 func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (int64, error) {
 	return s.Del(way...).Where(filter).Del()
 }
 
+// Update Quickly update data.
 func (s *{{{.OriginNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
 	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
 		mod.Modify(update).Where(filter)
 	}, way...)
 }
 
+// Select Quickly select data.
 func (s *{{{.OriginNamePascal}}}) Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error {
 	tmp := s.Get(way...)
 	get(tmp)
 	return tmp.Query(query)
 }
 
+// SelectGet Quickly select data to result.
 func (s *{{{.OriginNamePascal}}}) SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error {
 	tmp := s.Get(way...)
 	get(tmp)
 	return tmp.Get(result)
 }
 
-func (s *{{{.OriginNamePascal}}}) Count(filter hey.Filter) (int64, error) {
-	return s.Get().SubQueryGet(s.SelfSubGet(func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}) {
-		get.Where(s.F(filter))
-	}), hey.AliasA).Count()
+// Count Quickly COUNT(*) data.
+func (s *{{{.OriginNamePascal}}}) Count(filter hey.Filter, way ...*hey.Way) (int64, error) {
+	return s.Get(way...).Where(filter).Count()
 }
 
+// InsertMust Quickly insert data(affectedRows > 0).
 func (s *{{{.OriginNamePascal}}}) InsertMust(insert interface{}, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Insert(insert, way...))
 }
 
+// DeleteMust Quickly delete data(affectedRows > 0).
 func (s *{{{.OriginNamePascal}}}) DeleteMust(filter hey.Filter, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Delete(filter, way...))
 }
 
+// UpdateMust Quickly update data(affectedRows > 0).
 func (s *{{{.OriginNamePascal}}}) UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.Update(filter, update, way...))
 }
 
+// SelfExists Check whether the data exists(only current instance).
+func (s *{{{.OriginNamePascal}}}) SelfExists(fc func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (bool, error) {
+	query := s.Get(way...)
+	filter := s.F()
+	if fc != nil {
+		fc(query, filter, s.T)
+	}
+	return query.Where(filter).Limit(1).Exists()
+}
+
+// SelfInsert Quickly insert data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Add(way...).Except(s.AddExcept()...)
 	fc(tmp, s.T)
@@ -178,12 +224,14 @@ func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{
 	return tmp.Add()
 }
 
+// SelfDelete Quickly delete data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Del(way...)
 	fc(tmp, s.T)
 	return tmp.Del()
 }
 
+// SelfUpdate Quickly update data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Mod(way...).Except(s.ModExcept()...)
 	fc(tmp, s.T)
@@ -191,6 +239,7 @@ func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{
 	return tmp.Mod()
 }
 
+// SelfGetAll Quickly select all data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
 	tmp := s.Get(way...)
 	query(tmp)
@@ -198,6 +247,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*h
 	return
 }
 
+// SelfGetOne Quickly select one data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetAll(func(get *hey.Get) {
 		query(get)
@@ -212,6 +262,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*h
 	return nil, nil
 }
 
+// SelfSubGet Build query objects based on the current instance basic query(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
 	get := s.Get()
 	if query != nil {
@@ -220,18 +271,22 @@ func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.H
 	return get
 }
 
+// SelfInsertMust Quickly insert data(affectedRows > 0, only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfInsertMust(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfInsert(fc, way...))
 }
 
+// SelfDeleteMust Quickly delete data(affectedRows > 0, only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
 }
 
+// SelfUpdateMust Quickly update data(affectedRows > 0, only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
 }
 
+// SelfGetAllMust Quickly select all data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetAll(query, way...)
 	if err != nil {
@@ -243,6 +298,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get), way .
 	return tmp, nil
 }
 
+// SelfGetOneMust Quickly select one data(only current instance).
 func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetOne(query, way...)
 	if err != nil {

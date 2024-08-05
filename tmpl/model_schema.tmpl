@@ -58,6 +58,9 @@ type Table interface {
     // NotExistsIndex Get a list of non-existent fields.
     NotExistsIndex(fields []string) []int
 
+    // Exists Check whether the data exists.
+    Exists(fc func(get *hey.Get, f hey.Filter), way ...*hey.Way) (bool, error)
+
     // Insert For insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
     Insert(insert interface{}, way ...*hey.Way) (int64, error)
 
@@ -74,7 +77,7 @@ type Table interface {
     SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
 
     // Count For count the total number of data in the current table according to the conditions.
-    Count(filter hey.Filter) (int64, error)
+    Count(filter hey.Filter, way ...*hey.Way) (int64, error)
 
     // InsertMust The data must be successfully inserted into the table
     InsertMust(insert interface{}, way ...*hey.Way) error

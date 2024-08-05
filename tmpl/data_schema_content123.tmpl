@@ -55,7 +55,7 @@ func (s *{{{.OriginNamePascal}}}) OfUpdateForbidMsg() string {
 
 // OfExists 检测数据是否存在
 func (s *{{{.OriginNamePascal}}}) OfExists(ctx context.Context, filter hey.Filter, way ...*hey.Way) (bool, error) {
-	return s.Get(way...).Context(ctx).Where(filter).Exists()
+	return s.Get(way...).Context(ctx).Where(s.F(s.schema.selectFilter, filter)).Exists()
 }
 
 // OfExists1 检测数据是否存在
