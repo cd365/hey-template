@@ -20,8 +20,8 @@ var (
 	//go:embed tmpl/data_schema_content.tmpl
 	tmplDataSchemaContent []byte
 
-	//go:embed tmpl/data_schema_content123.tmpl
-	tmplDataSchemaContent123 []byte
+	//go:embed tmpl/data_schema_content_aab.tmpl
+	tmplDataSchemaContentAab []byte
 
 	//go:embed tmpl/biz_schema.tmpl
 	tmplBizSchema []byte
@@ -38,8 +38,8 @@ var (
 	//go:embed tmpl/asc_schema_content_custom.tmpl
 	tmplAscSchemaContentCustom []byte
 
-	//go:embed tmpl/asc_schema_content123.tmpl
-	tempAscSchemaCustom123 []byte
+	//go:embed tmpl/asc_schema_content_aab.tmpl
+	tempAscSchemaCustomAab []byte
 
 	//go:embed tmpl/can_schema.tmpl
 	tmplCanSchema []byte

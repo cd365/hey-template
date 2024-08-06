@@ -160,13 +160,23 @@ func (s *App) BuildAll() error {
 }
 
 const (
-	byteUnderline       byte = '_'
-	byte34                   = '"'
-	byte96                   = '`'
-	templateLeft             = "{{{"
-	templateRight            = "}}}"
-	tableFilenamePrefix      = "zzz_"
+	byteUnderline        byte = '_'
+	byte34                    = '"'
+	byte96                    = '`'
+	templateLeft              = "{{{"
+	templateRight             = "}}}"
+	tableFilenamePrefix       = "zzz_"
+	tableFilenameSuffix       = "_aaa"
+	tableFilenameSuffix1      = "_aab"
+	tableFilenameSuffix2      = "_aac"
+	tableFilenameGo           = ".go"
+	tableFilenameTmp          = ".tmp"
 )
+
+// tableFilenameGoTmp xxx.go => xxx.tmp
+func tableFilenameGoTmp(pathDirectory string) string {
+	return fmt.Sprintf("%s%s", strings.TrimSuffix(pathDirectory, tableFilenameGo), tableFilenameTmp)
+}
 
 func NewTemplate(name string, content []byte) *template.Template {
 	return template.Must(template.New(name).Delims(templateLeft, templateRight).Parse(*(*string)(unsafe.Pointer(&content))))

@@ -87,7 +87,6 @@ type TmplTableModel struct {
 }
 
 func (s *TmplTableModel) Make() {
-	columnUpdates := make([]string, 0)
 
 	// struct define
 	for i, c := range s.table.Column {
@@ -105,18 +104,7 @@ func (s *TmplTableModel) Make() {
 			tmp = fmt.Sprintf("\n%s", tmp)
 		}
 		s.StructColumn = append(s.StructColumn, tmp)
-
-		// update column
-		o := *c.ColumnName
-		p := c.pascal()
-		update := fmt.Sprintf(`
-	if s.%s != c.%s {
-		tmp["%s"] = c.%s
-	}`, p, p, o, p)
-		columnUpdates = append(columnUpdates, update)
 	}
-
-	s.StructColumnUpdate = strings.Join(columnUpdates, "")
 
 	// hey
 	for i, c := range s.table.Column {
@@ -182,6 +170,9 @@ func (s *TmplTableModel) Make() {
 	// ignore columns, for insert and update
 	var ignore []string
 
+	// cannotBeUpdatedFieldsMap Field map that does not need to be updated
+	cannotBeUpdatedFieldsMap := make(map[string]*struct{})
+
 	// table special fields
 	{
 		// auto increment field or timestamp field
@@ -216,6 +207,11 @@ func (s *TmplTableModel) Make() {
 
 		ignore = append(ignore, autoIncrement[:]...)
 		ignore = append(ignore, created[:]...)
+
+		for _, field := range ignore {
+			cannotBeUpdatedFieldsMap[field] = &struct{}{}
+		}
+
 		ignore = append(ignore, updated[:]...)
 		ignore = append(ignore, deleted[:]...)
 
@@ -238,6 +234,22 @@ func (s *TmplTableModel) Make() {
 		s.ColumnUpdatedAt = cs(updated...)
 		s.ColumnDeletedAt = cs(deleted...)
 	}
+
+	// update column
+	columnUpdates := make([]string, 0)
+	for _, c := range s.table.Column {
+		o := *c.ColumnName
+		if _, ok := cannotBeUpdatedFieldsMap[o]; ok {
+			continue
+		}
+		p := c.pascal()
+		update := fmt.Sprintf(`
+	if s.%s != c.%s {
+		tmp["%s"] = c.%s
+	}`, p, p, o, p)
+		columnUpdates = append(columnUpdates, update)
+	}
+	s.StructColumnUpdate = strings.Join(columnUpdates, "")
 
 	ignoreMap := make(map[string]struct{})
 	for _, v := range ignore {
@@ -354,7 +366,7 @@ func (s *App) Model() error {
 		if err := tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
+		modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err := s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
@@ -387,7 +399,7 @@ type TmplTableDataSchema struct {
 	MapListSlice   string // data_schema.go tables slice
 }
 
-type TmplTableDataSchema123 struct {
+type TmplTableDataSchemaAab struct {
 	Version string // 模板版本
 
 	OriginName           string // 原始表名称
@@ -430,7 +442,7 @@ func (s *App) Data() error {
 	// data_schema.go
 	tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
 	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
-	tmpDataSchemaContent123 := NewTemplate("data_schema_content123", tmplDataSchemaContent123)
+	tmpDataSchemaContentAab := NewTemplate("data_schema_content_aab", tmplDataSchemaContentAab)
 	tables := s.ber.AllTable()
 	schema := &TmplTableDataSchema{
 		Version:       s.Version,
@@ -442,15 +454,16 @@ func (s *App) Data() error {
 		if err := tmpDataSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
+		schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err := s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
 			return err
 		}
-		schemaContentFilename123 := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s123.go", tableFilenamePrefix, *table.TableName))
-		if _, err := os.Stat(schemaContentFilename123); err == nil {
-			schemaContentFilename123 = pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s123.tmp", tableFilenamePrefix, *table.TableName))
+
+		schemaContentFilenameAab := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
+		if _, err := os.Stat(schemaContentFilenameAab); err == nil {
+			schemaContentFilenameAab = tableFilenameGoTmp(schemaContentFilenameAab)
 		}
-		tmp123 := &TmplTableDataSchema123{
+		tmpAab := &TmplTableDataSchemaAab{
 			Version: tmp.Version,
 
 			OriginName:           tmp.OriginName,
@@ -461,11 +474,11 @@ func (s *App) Data() error {
 
 			PrefixPackage: tmp.PrefixPackage,
 		}
-		schemaContentBuffer123 := bytes.NewBuffer(nil)
-		if err := tmpDataSchemaContent123.Execute(schemaContentBuffer123, tmp123); err != nil {
+		schemaContentBufferAab := bytes.NewBuffer(nil)
+		if err := tmpDataSchemaContentAab.Execute(schemaContentBufferAab, tmpAab); err != nil {
 			return err
 		}
-		if err := s.WriteFile(schemaContentBuffer123, schemaContentFilename123); err != nil {
+		if err := s.WriteFile(schemaContentBufferAab, schemaContentFilenameAab); err != nil {
 			return err
 		}
 	}
@@ -675,26 +688,26 @@ func (s *App) Asc() error {
 			return err
 		}
 
-		// zzz_table_name.go
-		schemaContentFilename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
+		// PREFIX_table_name_SUFFIX.go
+		schemaContentFilename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if _, err = os.Stat(schemaContentFilename); err == nil {
-			schemaContentFilename = pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s.tmp", tableFilenamePrefix, *table.TableName))
+			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
 		}
 		if err = s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
 			return err
 		}
 
-		// zzz_table_name123.go 自定义业务代码
-		tmpAscSchemaContentBusinessGo := NewTemplate("asc_schema_content123", tempAscSchemaCustom123)
+		// PREFIX_table_name_SUFFIX.go 自定义业务代码
+		tmpAscSchemaContentBusinessGo := NewTemplate("asc_schema_content_aab", tempAscSchemaCustomAab)
 		tmpAscSchemaContentBusinessGoBuffer := bytes.NewBuffer(nil)
 		if err = tmpAscSchemaContentBusinessGo.Execute(tmpAscSchemaContentBusinessGoBuffer, tmp); err != nil {
 			return err
 		}
-		schemaCustom123Filename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s123.go", tableFilenamePrefix, *table.TableName))
-		if _, err = os.Stat(schemaCustom123Filename); err == nil {
-			schemaCustom123Filename = pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s123.tmp", tableFilenamePrefix, *table.TableName))
+		schemaCustomAabFilename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
+		if _, err = os.Stat(schemaCustomAabFilename); err == nil {
+			schemaCustomAabFilename = tableFilenameGoTmp(schemaCustomAabFilename)
 		}
-		if err = s.WriteFile(tmpAscSchemaContentBusinessGoBuffer, schemaCustom123Filename); err != nil {
+		if err = s.WriteFile(tmpAscSchemaContentBusinessGoBuffer, schemaCustomAabFilename); err != nil {
 			return err
 		}
 	}
@@ -754,10 +767,10 @@ func (s *App) Can() error {
 			return err
 		}
 
-		// zzz_table_name.go
-		schemaContentFilename := pathJoin(s.OutputDirectory, "can", fmt.Sprintf("%s%s.go", tableFilenamePrefix, *table.TableName))
+		// PREFIX_table_name_SUFFIX.go
+		schemaContentFilename := pathJoin(s.OutputDirectory, "can", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if _, err := os.Stat(schemaContentFilename); err == nil {
-			schemaContentFilename = pathJoin(s.OutputDirectory, "can", fmt.Sprintf("%s%s.tmp", tableFilenamePrefix, *table.TableName))
+			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
 		}
 		if err := s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
 			return err
