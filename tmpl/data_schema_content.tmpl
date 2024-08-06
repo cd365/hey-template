@@ -421,10 +421,11 @@ func (s *{{{.OriginNamePascal}}}) OfInsertMust(ctx context.Context, insert inter
 func (s *{{{.OriginNamePascal}}}) OfDelete(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	return s.SelfDelete(func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}) {
         del.Context(ctx)
-		filter := s.F(s.schema.deleteFilter)
-		if fc != nil {
-			fc(filter, t)
-		}
+		filter := s.F()
+        if fc != nil {
+            fc(filter, t)
+        }
+        filter.Filter(s.schema.deleteFilter)
 		del.Where(filter)
 	}, way...)
 }
@@ -439,11 +440,11 @@ func (s *{{{.OriginNamePascal}}}) OfUpdate(ctx context.Context, fc func(f hey.Fi
 	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
 		except := s.schema.updateIgnoreColumns
 		mod.Context(ctx).Except(except...)
-		filter := s.F(s.schema.updateFilter)
-		if fc != nil {
-			fc(filter, t)
-		}
-		mod.Where(filter)
+		filter := s.F()
+        if fc != nil {
+            fc(filter, t)
+        }
+        filter.Filter(s.schema.updateFilter)
 		if modify, ok := update.(map[string]interface{}); ok {
 			for k, v := range modify {
 				if s.FieldExist(k) {
@@ -479,11 +480,11 @@ func (s *{{{.OriginNamePascal}}}) OfUpdateMust1(ctx context.Context, fc func(f h
 // OfSelect 查询数据 (with *schema).
 func (s *{{{.OriginNamePascal}}}) OfSelect(ctx context.Context, query func(get *hey.Get, filter hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), takeOut func(get *hey.Get) error, way ...*hey.Way) error {
 	filter := s.F()
-	filter.Filter(s.schema.selectFilter)
 	get := s.Get(way...).Context(ctx).Column(s.schema.selectPermitColumns...)
 	if query != nil {
 		query(get, filter, s.T)
 	}
+	filter.Filter(s.schema.selectFilter)
 	get.Where(filter)
 	return takeOut(get)
 }
