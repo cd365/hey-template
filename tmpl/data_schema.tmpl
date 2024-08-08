@@ -4,9 +4,14 @@
 package data
 
 import (
+    "crypto/md5"
+    "crypto/sha256"
+    "fmt"
 	"github.com/cd365/hey"
+	"sync"
 
 	"{{{.PrefixPackage}}}/model"
+	"github.com/vmihailenco/msgpack/v5"
 )
 
 type schema struct {
@@ -185,3 +190,50 @@ func QueryAssign[T any, U any, K comparable](maps map[K]T, query func() ([]U, er
 	}
 	return nil
 }
+
+// MakeCacheKey 根据参数构建缓存键
+func MakeCacheKey(v interface{}) (string, error) {
+	bts, err := msgpack.Marshal(v)
+	if err != nil {
+		return hey.EmptyString, err
+	}
+	md5Sum := md5.Sum(bts)
+	sha256Sum256 := sha256.Sum256(bts)
+	return fmt.Sprintf("CDE:%X%X", md5Sum, sha256Sum256), nil
+}
+
+// MakeCacheKeys 根据参数构建缓存键
+func MakeCacheKeys(vvv ...interface{}) (string, error) {
+	return MakeCacheKey(vvv)
+}
+
+// CacheKeyMutex 缓存互斥锁集合(预防缓存击穿)
+type CacheKeyMutex struct {
+	capacity int
+	mutex    map[int]*sync.Mutex
+}
+
+// Get 根据缓存键根据一定的规则获取一把互斥锁(如果是分布式系统应该考虑 1.分布式锁, 2.使缓存数据永不过期, 3.提前预热(在系统上线前,提前将热点数据加载到缓存中) 等方案)
+func (s *CacheKeyMutex) Get(key string) *sync.Mutex {
+	return s.mutex[hey.MakeCacheQueryMutexIndex(key, s.capacity)]
+}
+
+// NewCacheKeyMutex 创建一个指定容量的缓存互斥锁集合
+func NewCacheKeyMutex(capacity int) *CacheKeyMutex {
+	if capacity <= 0 {
+		capacity = 512
+	}
+	tmp := &CacheKeyMutex{
+		capacity: capacity,
+		mutex:    make(map[int]*sync.Mutex, capacity),
+	}
+	for i := 0; i < capacity; i++ {
+		tmp.mutex[i] = &sync.Mutex{}
+	}
+	return tmp
+}
+
+var (
+    // CacheMutex 默认缓存互斥锁集合
+	CacheMutex = NewCacheKeyMutex(512)
+)
