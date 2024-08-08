@@ -6,6 +6,7 @@ package data
 import (
     "crypto/md5"
     "crypto/sha256"
+    "encoding/hex"
     "fmt"
 	"github.com/cd365/hey"
 	"sync"
@@ -205,6 +206,24 @@ func MakeCacheKey(v interface{}) (string, error) {
 // MakeCacheKeys 根据参数构建缓存键
 func MakeCacheKeys(vvv ...interface{}) (string, error) {
 	return MakeCacheKey(vvv)
+}
+
+// CacheMarshal 序列化待缓存的数据
+func CacheMarshal(v interface{}) (string, error) {
+	bts, err := msgpack.Marshal(v)
+	if err != nil {
+		return "", nil
+	}
+	return hex.EncodeToString(bts), nil
+}
+
+// CacheUnmarshal 反序列化已缓存的数据
+func CacheUnmarshal(b []byte, v interface{}) error {
+	bts, err := hex.DecodeString(string(b))
+	if err != nil {
+		return err
+	}
+	return msgpack.Unmarshal(bts, v)
 }
 
 // CacheKeyMutex 缓存互斥锁集合(预防缓存击穿)
