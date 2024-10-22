@@ -7,12 +7,12 @@
 //	@Produce	json
 //	@Param		data			body		abc.OfFilter	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
-//	@Success	200				{object}	echoes.RespBody				"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body				"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.TableName}}} [delete]
 func (s *{{{.TableNamePascal}}}) Delete(ctx echo.Context) error {
-    c := ctx.(*echoes.Ctx)
+    c := ctx.(*e.C)
     modify := make(map[string]interface{})
     timestamp := s.way.Now().Unix()
     {{{ range $val := .FieldLists -}}}
@@ -30,11 +30,12 @@ func (s *{{{.TableNamePascal}}}) Delete(ctx echo.Context) error {
         return c.Ok()
     }
     if err = s.ofDelete(ctx, filter); err != nil {
-		return c.FailErr(err)
+		return c.Err(err)
 	}
-    _, err = s.m.OfUpdate(c.Request().Context(), func(f hey.Filter, t *model.Hey{{{.TableNamePascal}}}) {
-		f.Filter(filter)
-	}, modify)
+    _, err = s.m.OfUpdate(c.Request().Context(), func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.TableNamePascal}}}) {
+		f.Use(filter)
+		mod.Modify(modify)
+	})
     if err != nil {
         return c.Fail(err.Error())
     }

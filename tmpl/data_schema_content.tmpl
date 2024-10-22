@@ -34,10 +34,10 @@ func New{{{.OriginNamePascal}}}(
 		W: way,
 	}
 	{
-        s.schema.insertIgnoreColumns = s.AddExcept()
-        s.schema.updateIgnoreColumns = s.ModExcept()
-        s.schema.insertPermitColumns = s.Field(s.schema.insertIgnoreColumns...)
-        s.schema.selectPermitColumns = s.Field(s.schema.selectIgnoreColumns...)
+        s.schema.insertExceptColumns = s.AddExcept()
+        s.schema.updateExceptColumns = s.ModExcept()
+        s.schema.insertPermitColumns = s.Field(s.schema.insertExceptColumns...)
+        s.schema.selectPermitColumns = s.Field(s.schema.selectExceptColumns...)
         s.schema.deleteFilter = s.F()
         s.schema.updateFilter = s.F()
         s.schema.selectFilter = s.F()
@@ -136,10 +136,10 @@ func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
 func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.CreatedAt() {
-		add.DefaultFieldValue(field, timestamp)
+		add.Default(func(o *hey.Add) { o.FieldValue(field, timestamp) })
 	}
 	for _, field := range s.UpdatedAt() {
-		add.DefaultFieldValue(field, timestamp)
+		add.Default(func(o *hey.Add) { o.FieldValue(field, timestamp) })
 	}
 }
 
@@ -147,7 +147,7 @@ func (s *{{{.OriginNamePascal}}}) AddAt(add *hey.Add, way ...*hey.Way) {
 func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
 	timestamp := AutoWay(s.W, way...).Now().Unix()
 	for _, field := range s.UpdatedAt() {
-		mod.DefaultSet(field, timestamp)
+		mod.Default(func(o *hey.Mod) { o.Set(field, timestamp) })
 	}
 }
 
@@ -160,6 +160,18 @@ func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
 		}
 	}
 	return result
+}
+
+// ExistsFields Get a list of existing fields.
+func (s *{{{.OriginNamePascal}}}) ExistsFields(fields ...string) []string {
+	length := len(fields)
+	result := make([]string, 0, length)
+	for i := 0; i < length; i++ {
+		if s.FieldExist(fields[i]) {
+			result = append(result, fields[i])
+		}
+	}
+	return result[:]
 }
 
 // Exists Check whether the data exists.
@@ -184,8 +196,9 @@ func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (in
 
 // Update Quickly update data.
 func (s *{{{.OriginNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
-		mod.Modify(update).Where(filter)
+	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Use(filter)
+        mod.Modify(update)
 	}, way...)
 }
 
@@ -242,32 +255,44 @@ func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{
 }
 
 // SelfDelete Quickly delete data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Del(way...)
-	fc(tmp, s.T)
+	where := s.F()
+    fc(tmp, where, s.T)
+    if !where.IsEmpty() {
+        tmp.Where(where)
+    }
 	return tmp.Del()
 }
 
 // SelfUpdate Quickly update data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
 	tmp := s.Mod(way...).Except(s.ModExcept()...)
-	fc(tmp, s.T)
-	s.ModAt(tmp, way...)
+	where := s.F()
+    fc(tmp, where, s.T)
+    s.ModAt(tmp, way...)
+    if !where.IsEmpty() {
+        tmp.Where(where)
+    }
 	return tmp.Mod()
 }
 
 // SelfGetAll Quickly select all data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
 	tmp := s.Get(way...)
-	query(tmp)
-	err = tmp.Get(&result)
+	where := s.F()
+    query(tmp, where, s.T)
+    if !where.IsEmpty() {
+        tmp.Where(where)
+    }
+    err = tmp.Get(&result)
 	return
 }
 
 // SelfGetOne Quickly select one data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
-	tmp, err := s.SelfGetAll(func(get *hey.Get) {
-		query(get)
+func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		query(get, f, t)
 		get.Limit(1)
 	}, way...)
 	if err != nil {
@@ -280,11 +305,15 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get), way ...*h
 }
 
 // SelfSubGet Build query objects based on the current instance basic query(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
+func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
 	get := s.Get()
-	if query != nil {
-		query(get, s.T)
-	}
+	where := s.F()
+    if query != nil {
+        query(get, where, s.T)
+        if !where.IsEmpty() {
+            get.Where(where)
+        }
+    }
 	return get
 }
 
@@ -294,17 +323,17 @@ func (s *{{{.OriginNamePascal}}}) SelfInsertMust(fc func(add *hey.Add, t *model.
 }
 
 // SelfDeleteMust Quickly delete data(affectedRows > 0, only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
 }
 
 // SelfUpdateMust Quickly update data(affectedRows > 0, only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
 }
 
 // SelfGetAllMust Quickly select all data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetAll(query, way...)
 	if err != nil {
 		return nil, err
@@ -316,7 +345,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get), way .
 }
 
 // SelfGetOneMust Quickly select one data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetOne(query, way...)
 	if err != nil {
 		return nil, err
@@ -327,21 +356,129 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get), way .
 	return tmp, nil
 }
 
+// SelfDeleteInsertAll Delete data and then insert in batches.
+func (s *{{{.OriginNamePascal}}}) SelfDeleteInsertAll(allData interface{}, where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+	return s.SelfSelectDeleteInsertAll(allData, where, nil, nil, insert, way...)
+}
+
+// SelfSelectDeleteInsertAll Select data, delete data and then insert in batches.
+func (s *{{{.OriginNamePascal}}}) SelfSelectDeleteInsertAll(
+	allData interface{},
+	where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}),
+	query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}),
+	allList func(list []*model.{{{.OriginNamePascal}}}),
+	insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}),
+	way ...*hey.Way,
+) error {
+	filter := s.F()
+	where(filter, s.T)
+	return AutoWay(s.W, way...).TxTry(func(tx *hey.Way) error {
+		if query != nil && allList != nil {
+			list, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+				f.Use(filter)
+				query(get, t)
+			})
+			if err != nil {
+				return err
+			}
+			allList(list)
+		}
+		if _, err := s.Delete(filter, tx); err != nil {
+			return err
+		}
+		add := s.Add(tx)
+		if insert != nil {
+			insert(add, s.T)
+		}
+		if _, err := add.Create(allData).Add(); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+// SelfUpdateInsertAll Update or insert.
+func (s *{{{.OriginNamePascal}}}) SelfUpdateInsertAll(
+	dataWhere []func() (
+		data interface{},
+		where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}),
+	),
+	exists func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}),
+	insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}),
+	update func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}),
+	way ...*hey.Way,
+) error {
+	length := len(dataWhere)
+	if length == 0 {
+		return nil
+	}
+	fields := s.Field()
+	return AutoWay(s.W, way...).TxTry(func(tx *hey.Way) error {
+		for i := 0; i < length; i++ {
+			if dataWhere[i] == nil {
+				continue
+			}
+			data, where := dataWhere[i]()
+			if data == nil || where == nil {
+				continue
+			}
+			filter := s.F()
+			where(filter, s.T)
+			if filter.IsEmpty() {
+				continue
+			}
+			has, err := s.SelfGetOne(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+				if exists != nil {
+					exists(get, t)
+				} else {
+					get.Column(fields[0])
+				}
+				f.Use(filter)
+			}, tx)
+			if err != nil {
+				return err
+			}
+			if has == nil {
+				add := s.Add(tx)
+				if insert != nil {
+					insert(add, s.T)
+				}
+				_, err = add.Create(data).Add()
+				if err != nil {
+					return err
+				}
+			} else {
+				_, err = s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+					if update != nil {
+						update(mod, t)
+					}
+					f.Use(filter)
+					mod.Modify(data)
+				}, tx)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+}
+
 // using *schema methods, with `Of` prefix.
 
-// OfInsertIgnoreColumns 插入数据需要忽略的字段列表 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfInsertIgnoreColumns() []string {
-	return s.schema.insertIgnoreColumns[:]
+// OfInsertExceptColumns 插入数据需要忽略的字段列表 (with *schema).
+func (s *{{{.OriginNamePascal}}}) OfInsertExceptColumns() []string {
+	return s.schema.insertExceptColumns[:]
 }
 
-// OfUpdateIgnoreColumns 更新数据需要忽略的字段列表 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdateIgnoreColumns() []string {
-	return s.schema.updateIgnoreColumns[:]
+// OfUpdateExceptColumns 更新数据需要忽略的字段列表 (with *schema).
+func (s *{{{.OriginNamePascal}}}) OfUpdateExceptColumns() []string {
+	return s.schema.updateExceptColumns[:]
 }
 
-// OfSelectIgnoreColumns 查询数据需要忽略的字段列表 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectIgnoreColumns() []string {
-	return s.schema.selectIgnoreColumns[:]
+// OfSelectExceptColumns 查询数据需要忽略的字段列表 (with *schema).
+func (s *{{{.OriginNamePascal}}}) OfSelectExceptColumns() []string {
+	return s.schema.selectExceptColumns[:]
 }
 
 // OfDeleteFilter 删除数据的前提条件(删除的数据必须满足当前方法返回的条件) (with *schema).
@@ -369,23 +506,19 @@ func (s *{{{.OriginNamePascal}}}) OfUpdateForbidMsg() string {
 	return s.schema.updateForbidMsg
 }
 
-// OfExists 检测数据是否存在 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfExists(ctx context.Context, filter hey.Filter, way ...*hey.Way) (bool, error) {
-	return s.Get(way...).Context(ctx).Where(s.F(s.schema.selectFilter, filter)).Exists()
-}
 
-// OfExists1 检测数据是否存在 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfExists1(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (bool, error) {
+// OfExists 检测数据是否存在 (with *schema).
+func (s *{{{.OriginNamePascal}}}) OfExists(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (bool, error) {
 	filter := s.F()
-	if fc != nil {
-		fc(filter, s.T)
-	}
-	return s.OfExists(ctx, filter, way...)
+    if fc != nil {
+        fc(filter, s.T)
+    }
+    return s.Get(way...).Context(ctx).Where(s.F(s.schema.selectFilter, filter)).Exists()
 }
 
 // OfInsert 插入数据 (with *schema).
 func (s *{{{.OriginNamePascal}}}) OfInsert(ctx context.Context, insert interface{}, way ...*hey.Way) (int64, error) {
-	add := s.Add(way...).Context(ctx).Except(s.schema.insertIgnoreColumns...)
+	add := s.Add(way...).Context(ctx).Except(s.schema.insertExceptColumns...)
 	if fieldValue, ok := insert.(map[string]interface{}); ok {
 		allow := make(map[string]*struct{})
 		for _, field := range s.schema.insertPermitColumns {
@@ -408,7 +541,7 @@ func (s *{{{.OriginNamePascal}}}) OfInsert(ctx context.Context, insert interface
 		s.AddAt(add, way...)
 		return add.Add()
 	}
-	fields, values := hey.StructInsert(insert, s.W.Tag(), s.schema.insertIgnoreColumns, s.schema.insertPermitColumns)
+	fields, values := hey.StructInsert(insert, s.W.Tag(), s.schema.insertExceptColumns, s.schema.insertPermitColumns)
 	if len(fields) == 0 {
 		return 0, nil
 	}
@@ -424,14 +557,14 @@ func (s *{{{.OriginNamePascal}}}) OfInsertMust(ctx context.Context, insert inter
 
 // OfDelete 删除数据 (with *schema).
 func (s *{{{.OriginNamePascal}}}) OfDelete(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
-	return s.SelfDelete(func(del *hey.Del, t *model.Hey{{{.OriginNamePascal}}}) {
+	return s.SelfDelete(func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
         del.Context(ctx)
-		filter := s.F()
         if fc != nil {
-            fc(filter, t)
+            fc(f, t)
         }
-        filter.Filter(s.schema.deleteFilter)
-		del.Where(filter)
+        if !f.IsEmpty() {
+            f.Use(s.schema.deleteFilter)
+        }
 	}, way...)
 }
 
@@ -442,14 +575,14 @@ func (s *{{{.OriginNamePascal}}}) OfDeleteMust(ctx context.Context, fc func(f he
 
 // OfUpdate 更新数据 (with *schema).
 func (s *{{{.OriginNamePascal}}}) OfUpdate(ctx context.Context, fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}) {
-		mod.Context(ctx).Except(s.schema.updateIgnoreColumns...)
-		f := s.F()
+	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		mod.Context(ctx).Except(s.schema.updateExceptColumns...)
 		if fc != nil {
 			fc(mod, f, t)
 		}
-		f.Filter(s.schema.updateFilter)
-		mod.Where(f)
+		if !f.IsEmpty() {
+            f.Use(s.schema.updateFilter)
+        }
 	}, way...)
 }
 
@@ -468,7 +601,7 @@ func (s *{{{.OriginNamePascal}}}) OfUpdate1(ctx context.Context, fc func(f hey.F
 				}
 			}
 		} else {
-			fields, values := hey.StructModify(update, s.W.Tag(), s.schema.updateIgnoreColumns...)
+			fields, values := hey.StructModify(update, s.W.Tag(), s.schema.updateExceptColumns...)
 			for index, field := range fields {
 				if s.FieldExist(field) {
 					mod.Set(field, values[index])
@@ -503,7 +636,7 @@ func (s *{{{.OriginNamePascal}}}) OfSubGet(fc func(get *hey.Get, f hey.Filter, t
 	if fc != nil {
 		fc(subQuery, filter, s.T)
 	}
-	filter.Filter(s.schema.selectFilter)
+	filter.Use(s.schema.selectFilter)
 	return subQuery.Where(filter)
 }
 
@@ -514,7 +647,7 @@ func (s *{{{.OriginNamePascal}}}) OfSelect(ctx context.Context, query func(get *
 	if query != nil {
 		query(get, filter, s.T)
 	}
-	filter.Filter(s.schema.selectFilter)
+	filter.Use(s.schema.selectFilter)
 	get.Where(filter)
 	return takeOut(get)
 }

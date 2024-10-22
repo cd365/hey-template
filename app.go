@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	Version = "v0.3.0"
+	Version = "v0.4.0"
 )
 
 var (
@@ -199,6 +199,22 @@ func pascal(name string) string {
 		next2upper = false
 	}
 	return string(tmp[:])
+}
+
+func underline(str string) string {
+	length := len(str)
+	tmp := make([]byte, 0, length)
+	for i := 0; i < length; i++ {
+		if str[i] >= 'A' && str[i] <= 'Z' {
+			if i > 0 {
+				tmp = append(tmp, byteUnderline)
+			}
+			tmp = append(tmp, str[i]+32)
+		} else {
+			tmp = append(tmp, str[i])
+		}
+	}
+	return *(*string)(unsafe.Pointer(&tmp))
 }
 
 func pathJoin(items ...string) string {

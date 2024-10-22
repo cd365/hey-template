@@ -11,7 +11,7 @@ import (
     "context"
     "github.com/cd365/g"
 	"github.com/cd365/hey"
-	"github.com/cd365/echoes"
+	"github.com/cd365/echoes/e"
 	"{{{.PrefixPackage}}}/abc"
 	"{{{.PrefixPackage}}}/data"
 	"{{{.PrefixPackage}}}/model"
@@ -66,22 +66,22 @@ func (s *{{{.OriginNamePascal}}}) Route(group *echo.Group) {
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
 //	@Param		object			body		model.Add{{{.OriginNamePascal}}}	true	"request body args"
-//	@Success	200				{object}	echoes.RespBody				"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body				"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [post]
 func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
-    c := ctx.(*echoes.Ctx)
+    c := ctx.(*e.C)
     args := &model.Add{{{.OriginNamePascal}}}{}
     if err := ctx.Bind(args); err != nil {
         return c.Bad(err)
     }
     if err := s.ofInsert(ctx, args); err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     n, err := s.m.OfInsert(ctx.Request().Context(), args)
 	if err != nil {
-		return c.FailErr(err)
+		return c.Err(err)
 	}
 	if n == 0 {
 		return c.Fail("新增失败")
@@ -97,12 +97,12 @@ func (s *{{{.OriginNamePascal}}}) Insert(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"token"
 //	@Param		object			body		[]model.Add{{{.OriginNamePascal}}}	true	"request body args"
-//	@Success	200				{object}	echoes.RespBody				"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body				"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/batch [post]
 func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
-	c := ctx.(*echoes.Ctx)
+	c := ctx.(*e.C)
     args := make([]*model.Add{{{.OriginNamePascal}}}, 0)
     if err := ctx.Bind(&args); err != nil {
         return c.Bad(err)
@@ -111,11 +111,11 @@ func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
         return c.Fail("数据量过大")
     }
     if err := s.ofInsert(ctx, args...); err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     n, err := s.m.OfInsert(ctx.Request().Context(), args)
 	if err != nil {
-		return c.FailErr(err)
+		return c.Err(err)
 	}
 	if n == 0 {
 		return c.Fail("批量新增失败")
@@ -131,12 +131,12 @@ func (s *{{{.OriginNamePascal}}}) InsertBatch(ctx echo.Context) error {
 //	@Produce	json
 //	@Param		data			body		abc.OfFilter	true	"filter"	1
 //	@Param		Authorization	header		string	true	"authorization"
-//	@Success	200				{object}	echoes.RespBody				"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body				"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}}/remove [delete]
 func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
-	c := ctx.(*echoes.Ctx)
+	c := ctx.(*e.C)
     args := &abc.OfFilter{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
@@ -149,13 +149,13 @@ func (s *{{{.OriginNamePascal}}}) Remove(ctx echo.Context) error {
         return c.Ok()
     }
     if err = s.ofRemove(ctx,filter);err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     _, err = s.m.OfDelete(ctx.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
-		f.Filter(filter)
+		f.Use(filter)
 	})
     if err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     return c.Ok()
 }
@@ -173,12 +173,12 @@ type {{{.OriginNamePascal}}}UpdateArgs struct {
 //	@Produce	json
 //	@Param		Authorization	header		string				true	"authorization"
 //	@Param		object			body		{{{.OriginNamePascal}}}UpdateArgs	true	"request body args"
-//	@Success	200				{object}	echoes.RespBody				"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body				"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [put]
 func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
-	c := ctx.(*echoes.Ctx)
+	c := ctx.(*e.C)
     args := &{{{.OriginNamePascal}}}UpdateArgs{}
     if err := c.Bind(args); err != nil {
         return c.Bad(err)
@@ -191,20 +191,21 @@ func (s *{{{.OriginNamePascal}}}) Update(ctx echo.Context) error {
         return c.Ok()
     }
     if err = s.ofUpdate(ctx,filter,args);err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
-    _, err = s.m.OfUpdate(c.Request().Context(), func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
-		f.Filter(filter)
-	}, args.Mod{{{.OriginNamePascal}}})
+    _, err = s.m.OfUpdate(ctx.Request().Context(), func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+		f.Use(filter)
+		mod.Modify(args.Mod{{{.OriginNamePascal}}})
+	})
     if err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     return c.Ok()
 }
 
 func (s *{{{.OriginNamePascal}}}) adminSelectGet(ctx context.Context, query *abc.GetQuery, way ...*hey.Way) (*hey.Get, error) {
 	get := s.m.Get(way...).Context(ctx)
-    selectIgnoreColumns := s.m.OfSelectIgnoreColumns()
+    selectIgnoreColumns := s.m.OfSelectExceptColumns()
 	selectIgnoreColumns = append(selectIgnoreColumns, s.ofSelectIgnoreColumns()...)
 	fields := s.m.Field(selectIgnoreColumns...)
     get.Column(fields...)
@@ -293,19 +294,19 @@ func (s *{{{.OriginNamePascal}}}) SelectViewMap(ctx context.Context, query *abc.
 //	@Produce	json
 //	@Param		data			query		abc.GetQuery	false	"object"
 //	@Param		Authorization	header		string			true	"authorization"
-//	@Success	200				{object}	echoes.RespBody{data=[]model.{{{.OriginNamePascal}}}}			"-"
-//	@Success	400				{object}	echoes.RespBody				"-"
-//	@Failure	500				{object}	echoes.RespBody				"-"
+//	@Success	200				{object}	e.Body{data=[]model.{{{.OriginNamePascal}}}}			"-"
+//	@Success	400				{object}	e.Body				"-"
+//	@Failure	500				{object}	e.Body				"-"
 //	@Router		{{{.UrlPrefix}}}/{{{.OriginName}}} [get]
 func (s *{{{.OriginNamePascal}}}) Select(ctx echo.Context) error {
-    c := ctx.(*echoes.Ctx)
+    c := ctx.(*e.C)
 	query := &abc.GetQuery{}
     if err := c.Bind(query); err != nil {
         return c.Bad(err)
     }
     result, err := s.SelectViewMap(ctx.Request().Context(), query)
     if err != nil {
-        return c.FailErr(err)
+        return c.Err(err)
     }
     if query.IsCount {
         c.Count(query.Count)

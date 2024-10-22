@@ -221,12 +221,12 @@ func (s OfFilter) parse() (fields []string, fieldsMap map[string]hey.Filter, err
 			if len(values) == 0 {
 				return nil, nil, ErrInvalidFilterValue
 			}
-			add(field, hey.F().Greater(field, values[0]))
+			add(field, hey.F().GreaterThan(field, values[0]))
 		case "05:":
 			if len(values) == 0 {
 				return nil, nil, ErrInvalidFilterValue
 			}
-			add(field, hey.F().GreaterEqual(field, values[0]))
+			add(field, hey.F().GreaterThanEqual(field, values[0]))
 		case "06:":
 			if len(values) == 0 {
 				return nil, nil, ErrInvalidFilterValue
@@ -291,7 +291,7 @@ func (s OfFilter) GetFilter(fields ...string) (hey.Filter, error) {
 				continue
 			}
 		}
-		filter.Filter(fieldsMap[v])
+		filter.Use(fieldsMap[v])
 	}
 
 	return filter, nil
