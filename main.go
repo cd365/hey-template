@@ -42,10 +42,18 @@ func main() {
 
 	if config.BuildAt != "" {
 		cmd.Version = fmt.Sprintf("%s %s", cmd.Version, config.BuildAt)
+	} else {
+		if BuildTime != "" {
+			cmd.Version = fmt.Sprintf("%s %s", cmd.Version, BuildTime)
+		}
 	}
 
 	if config.GitHash != "" {
 		cmd.Version = fmt.Sprintf("%s %s", cmd.Version, config.GitHash)
+	} else {
+		if CommitHash != "" {
+			cmd.Version = fmt.Sprintf("%s %s", cmd.Version, CommitHash)
+		}
 	}
 
 	if viewVersion {
