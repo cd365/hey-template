@@ -39,8 +39,8 @@ func SetConfig(configFile string) error {
 	defer func() { _ = fil.Close() }()
 	config := &Config{
 		Version:                    "v0.0.1",
-		BuildAt:                    "",
-		GitHash:                    "",
+		BuildAt:                    "20200303080000",
+		GitHash:                    "0000000000000000000000000000000000000000",
 		Driver:                     "postgres",
 		DataSourceName:             "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
 		TableSchemaName:            "public",
