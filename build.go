@@ -15,7 +15,7 @@ type TmplWire struct {
 	Content string // 内容
 }
 
-func (s *App) MakeTmplWire(pkg string, customLines ...string) error {
+func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string) error {
 	w := &TmplWire{
 		Version: s.Version,
 		Package: pkg,
@@ -23,7 +23,7 @@ func (s *App) MakeTmplWire(pkg string, customLines ...string) error {
 	temp := NewTemplate("tmp_wire", tmplWire)
 	text := bytes.NewBuffer(nil)
 	newTable := func(i int, table *SysTable) string {
-		tmp := fmt.Sprintf("New%s,", table.pascal())
+		tmp := fmt.Sprintf("New%s%s,", table.pascal(), suffixName)
 		if i > 0 {
 			tmp = fmt.Sprintf("\n\t%s", tmp)
 		}
@@ -68,17 +68,16 @@ type TmplTableModel struct {
 	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
 
 	// model
-	StructColumn                   []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
-	StructColumnHey                []string // 表结构体字段关系定义 ==> Name string // name 名称
-	StructColumnHeyFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
-	StructColumnHeyFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
-	StructColumnMod                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
-	StructColumnAdd                []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
-	StructColumnUpdate             string   // 表结构体字段更新 ==> if s.Id != t.Id { tmp["id"] = t.Id }
+	StructColumn                      []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
+	StructColumnSchema                []string // 表结构体字段关系定义 ==> Name string // name 名称
+	StructColumnSchemaFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
+	StructColumnSchemaFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
+	StructColumnMod                   []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
+	StructColumnAdd                   []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
 
-	StructColumnHeyValues          []string // NewHey.Attribute ==> Name:"name", // 名称
-	StructColumnHeyValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
-	StructColumnHeyValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
+	StructColumnSchemaValues          []string // NewHey.Attribute ==> Name:"name", // 名称
+	StructColumnSchemaValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
+	StructColumnSchemaValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
 
 	ColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
 	ColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
@@ -116,7 +115,7 @@ func (s *TmplTableModel) Make() {
 		if i != 0 {
 			tmp = fmt.Sprintf("\n%s", tmp)
 		}
-		s.StructColumnHey = append(s.StructColumnHey, tmp)
+		s.StructColumnSchema = append(s.StructColumnSchema, tmp)
 	}
 
 	// column list
@@ -140,31 +139,31 @@ func (s *TmplTableModel) Make() {
 			if i != 0 {
 				tmp = fmt.Sprintf("\n%s", tmp)
 			}
-			s.StructColumnHeyValues = append(s.StructColumnHeyValues, tmp)
+			s.StructColumnSchemaValues = append(s.StructColumnSchemaValues, tmp)
 		}
 
 		{
 			s96 := string(byte96) // `
 			s34 := `"`            // "
-			s.StructColumnHeyFieldSlice = strings.Join(field, ", ")
+			s.StructColumnSchemaFieldSlice = strings.Join(field, ", ")
 			switch s.table.app.TypeDriver() {
 			case DriverMysql:
-				s.StructColumnHeyFieldSlice = strings.ReplaceAll(s.StructColumnHeyFieldSlice, s34, s96)
+				s.StructColumnSchemaFieldSlice = strings.ReplaceAll(s.StructColumnSchemaFieldSlice, s34, s96)
 			}
-			if strings.Contains(s.StructColumnHeyFieldSlice, s96) {
-				s.StructColumnHeyFieldSliceValue = hey.ConcatString(s34, s.StructColumnHeyFieldSlice, s34)
+			if strings.Contains(s.StructColumnSchemaFieldSlice, s96) {
+				s.StructColumnSchemaFieldSliceValue = hey.ConcatString(s34, s.StructColumnSchemaFieldSlice, s34)
 			} else {
-				s.StructColumnHeyFieldSliceValue = hey.ConcatString(s96, s.StructColumnHeyFieldSlice, s96)
+				s.StructColumnSchemaFieldSliceValue = hey.ConcatString(s96, s.StructColumnSchemaFieldSlice, s96)
 			}
 		}
 
-		s.StructColumnHeyValuesAccess = fmt.Sprintf("[]string{\n\t\t%s\n\t}", strings.Join(fieldAccess, "\n\t\t"))
+		s.StructColumnSchemaValuesAccess = fmt.Sprintf("[]string{\n\t\t%s\n\t}", strings.Join(fieldAccess, "\n\t\t"))
 
 		fieldAccessMap := fieldAccess[:]
 		for k, v := range fieldAccessMap {
 			fieldAccessMap[k] = strings.Replace(v, ",", ":{},", 1)
 		}
-		s.StructColumnHeyValuesAccessMap = fmt.Sprintf("map[string]*struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
+		s.StructColumnSchemaValuesAccessMap = fmt.Sprintf("map[string]*struct{}{\n\t\t%s\n\t}", strings.Join(fieldAccessMap, "\n\t\t"))
 	}
 
 	// ignore columns, for insert and update
@@ -234,22 +233,6 @@ func (s *TmplTableModel) Make() {
 		s.ColumnUpdatedAt = cs(updated...)
 		s.ColumnDeletedAt = cs(deleted...)
 	}
-
-	// update column
-	columnUpdates := make([]string, 0)
-	for _, c := range s.table.Column {
-		o := *c.ColumnName
-		if _, ok := cannotBeUpdatedFieldsMap[o]; ok {
-			continue
-		}
-		p := c.pascal()
-		update := fmt.Sprintf(`
-	if s.%s != c.%s {
-		tmp["%s"] = c.%s
-	}`, p, p, o, p)
-		columnUpdates = append(columnUpdates, update)
-	}
-	s.StructColumnUpdate = strings.Join(columnUpdates, "")
 
 	ignoreMap := make(map[string]struct{})
 	for _, v := range ignore {
@@ -331,7 +314,7 @@ func (s *TmplTableModel) Make() {
 
 func (s *App) Model() error {
 	// model.go
-	if err := s.MakeTmplWire("model"); err != nil {
+	if err := s.MakeTmplWire("model", "Schema"); err != nil {
 		return err
 	}
 	// model_schema.go
@@ -436,6 +419,7 @@ func (s *App) Data() error {
 	// data.go
 	if err := s.MakeTmplWire(
 		"data",
+		"",
 		"\n\tNewTables, // all instances",
 	); err != nil {
 		return err
@@ -559,7 +543,7 @@ type TmplTableBiz struct {
 
 func (s *App) Biz() error {
 	// biz.go
-	if err := s.MakeTmplWire("biz"); err != nil {
+	if err := s.MakeTmplWire("biz", ""); err != nil {
 		return err
 	}
 	// biz_schema.tmpl
@@ -668,7 +652,7 @@ func (s *TmplTableAsc) Make() (buffer *bytes.Buffer, err error) {
 
 func (s *App) Asc() error {
 	// asc.go
-	if err := s.MakeTmplWire("asc"); err != nil {
+	if err := s.MakeTmplWire("asc", ""); err != nil {
 		return err
 	}
 	tmpAscSchemaContent := NewTemplate("asc_schema_content", tmplAscSchemaContent)
@@ -747,7 +731,7 @@ type TmplTableCan struct {
 
 func (s *App) Can() error {
 	// can.go
-	if err := s.MakeTmplWire("can"); err != nil {
+	if err := s.MakeTmplWire("can", ""); err != nil {
 		return err
 	}
 	// can_schema.go

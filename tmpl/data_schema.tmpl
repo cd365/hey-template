@@ -73,7 +73,7 @@ func AutoWay(defaultWay *hey.Way, options ...*hey.Way) *hey.Way {
 	return defaultWay
 }
 
-func (s *Tables) MAP() map[string]model.Table {
+func (s *Tables) GetMap() map[string]model.Table {
 	length := len(s.tableMap)
 	result := make(map[string]model.Table, length)
 	for k, v := range s.tableMap {
@@ -82,66 +82,11 @@ func (s *Tables) MAP() map[string]model.Table {
 	return result
 }
 
-func (s *Tables) SLICE() []string {
+func (s *Tables) GetSlice() []string {
 	length := len(s.tableSlice)
 	result := make([]string, length)
 	copy(result, s.tableSlice)
 	return result
-}
-
-func (s *Tables) WRITER(table model.Table, way ...*hey.Way) Writer {
-	return &writer{
-		table: table,
-		way:   AutoWay(table.Add().Way(), way...),
-	}
-}
-
-type Writer interface {
-	Add(i interface{}, prefix ...func(add *hey.Add)) (int64, error)
-	AddMust(i interface{}, prefix ...func(add *hey.Add)) error
-	Del(where hey.Filter) (int64, error)
-	DelMust(where hey.Filter) error
-	Mod(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) (int64, error)
-	ModMust(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) error
-}
-
-type writer struct {
-	table model.Table
-	way   *hey.Way
-}
-
-func (s *writer) Add(i interface{}, prefix ...func(add *hey.Add)) (int64, error) {
-	tmp := s.table.Add(s.way).Except(s.table.AddExcept()...)
-	if length := len(prefix); length > 0 {
-		prefix[length-1](tmp)
-	}
-	s.table.AddAt(tmp, s.way)
-	return tmp.Create(i).Add()
-}
-
-func (s *writer) AddMust(i interface{}, prefix ...func(add *hey.Add)) error {
-	return hey.MustAffectedRows(s.Add(i, prefix...))
-}
-
-func (s *writer) Del(where hey.Filter) (int64, error) {
-	return s.table.Del(s.way).Where(where).Del()
-}
-
-func (s *writer) DelMust(where hey.Filter) error {
-	return hey.MustAffectedRows(s.Del(where))
-}
-
-func (s *writer) Mod(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) (int64, error) {
-	tmp := s.table.Mod(s.way).Except(s.table.ModExcept()...)
-	if length := len(prefix); length > 0 {
-		prefix[length-1](tmp)
-	}
-	s.table.ModAt(tmp, s.way)
-	return tmp.Where(where).Modify(modify).Mod()
-}
-
-func (s *writer) ModMust(where hey.Filter, modify interface{}, prefix ...func(mod *hey.Mod)) error {
-	return hey.MustAffectedRows(s.Mod(where, modify, prefix...))
 }
 
 // MakeSliceMap 提取字段并构建哈希表和哈希表键值切片

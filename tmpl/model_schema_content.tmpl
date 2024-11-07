@@ -8,34 +8,25 @@ type {{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumn}}}{{{$v}}}{{{end}}}
 }
 
-func (s *{{{.OriginNamePascal}}}) COPY() *{{{.OriginNamePascal}}} {
-	tmp := *s
-	return &tmp
+func (s *{{{.OriginNamePascal}}}) Schema() *{{{.OriginNamePascal}}}Schema {
+	return New{{{.OriginNamePascal}}}Schema()
 }
 
-func (s *{{{.OriginNamePascal}}}) COMPARE(c *{{{.OriginNamePascal}}}) map[string]interface{} {
-	tmp := make(map[string]interface{}){{{.StructColumnUpdate}}}
-	if len(tmp) == 0 {
-        return nil
-    }
-	return tmp
-}
-
-type Hey{{{.OriginNamePascal}}} struct {
-{{{range $k, $v := .StructColumnHey}}}{{{$v}}}{{{end}}}
+type {{{.OriginNamePascal}}}Schema struct {
+{{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
     fieldMap map[string]*struct{}
     fieldSlice []string
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) Table() string {
-	return "{{{.OriginNameWithPrefix}}}" {{{if ne .Comment ""}}}// {{{.Comment}}}{{{end}}}
+func (s *{{{.OriginNamePascal}}}Schema) Table() string {
+	return "{{{.OriginNameWithPrefix}}}"
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) Comment() string {
+func (s *{{{.OriginNamePascal}}}Schema) Comment() string {
 	return "{{{.Comment}}}"
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) Field(except ...string) []string {
+func (s *{{{.OriginNamePascal}}}Schema) Column(except ...string) []string {
 	excepted := make(map[string]*struct{})
     for _, v := range except {
         excepted[v] = &struct{}{}
@@ -50,7 +41,7 @@ func (s *Hey{{{.OriginNamePascal}}}) Field(except ...string) []string {
     return result
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldMap() map[string]*struct{} {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnMap() map[string]*struct{} {
 	result := make(map[string]*struct{}, len(s.fieldMap))
 	for k, v := range s.fieldMap {
 		result[k] = v
@@ -58,37 +49,37 @@ func (s *Hey{{{.OriginNamePascal}}}) FieldMap() map[string]*struct{} {
 	return result
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldStr() string {
-	return {{{.StructColumnHeyFieldSliceValue}}}
+func (s *{{{.OriginNamePascal}}}Schema) ColumnString() string {
+	return {{{.StructColumnSchemaFieldSliceValue}}}
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldExist(field string) bool {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnExist(field string) bool {
 	_, exist := s.fieldMap[field]
 	return exist
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldAutoIncr() []string {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnAutoIncr() []string {
 	return {{{.ColumnAutoIncr}}}
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldCreatedAt() []string {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnCreatedAt() []string {
 	return {{{.ColumnCreatedAt}}}
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldUpdatedAt() []string {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnUpdatedAt() []string {
 	return {{{.ColumnUpdatedAt}}}
 }
 
-func (s *Hey{{{.OriginNamePascal}}}) FieldDeletedAt() []string {
+func (s *{{{.OriginNamePascal}}}Schema) ColumnDeletedAt() []string {
 	return {{{.ColumnDeletedAt}}}
 }
 
-func New{{{.OriginNamePascal}}}() *Hey{{{.OriginNamePascal}}} {
-	s := &Hey{{{.OriginNamePascal}}}{
-{{{range $k, $v := .StructColumnHeyValues}}}{{{$v}}}{{{end}}}
+func New{{{.OriginNamePascal}}}Schema() *{{{.OriginNamePascal}}}Schema {
+	s := &{{{.OriginNamePascal}}}Schema{
+{{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
 	}
-	s.fieldMap = {{{.StructColumnHeyValuesAccessMap}}}
-	s.fieldSlice = {{{.StructColumnHeyValuesAccess}}}
+	s.fieldMap = {{{.StructColumnSchemaValuesAccessMap}}}
+	s.fieldSlice = {{{.StructColumnSchemaValuesAccess}}}
 	return s
 }
 

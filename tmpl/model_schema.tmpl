@@ -10,90 +10,93 @@ import (
 )
 
 type Table interface {
-    // Add INSERT.
-    Add(way ...*hey.Way) *hey.Add
+	// Add INSERT.
+	Add(way ...*hey.Way) *hey.Add
 
-    // Del DELETE.
-    Del(way ...*hey.Way) *hey.Del
+	// Del DELETE.
+	Del(way ...*hey.Way) *hey.Del
 
-    // Mod UPDATE.
-    Mod(way ...*hey.Way) *hey.Mod
+	// Mod UPDATE.
+	Mod(way ...*hey.Way) *hey.Mod
 
-    // Get SELECT.
-    Get(way ...*hey.Way) *hey.Get
+	// Get SELECT.
+	Get(way ...*hey.Way) *hey.Get
 
-    // Table Get table name.
-    Table() string
+	// Table Get table name.
+	Table() string
 
-    // Field Get a list of fields.
-    Field(except ...string) []string
+	// Comment Get table comment.
+    Comment() string
 
-    // FieldMap Get fields map.
-    FieldMap() map[string]*struct{}
+	// Column Get a list of columns.
+	Column(except ...string) []string
 
-    // FieldExist Does the field exist.
-    FieldExist(field string) bool
+	// ColumnMap Get columns map.
+	ColumnMap() map[string]*struct{}
 
-    // CreatedAt Add timestamp value of fields when INSERT.
-    CreatedAt() []string
+	// ColumnExist Does the column exist.
+	ColumnExist(column string) bool
 
-    // UpdatedAt Add timestamp value of fields when UPDATE.
-    UpdatedAt() []string
+	// CreatedAt Add timestamp value of fields when INSERT.
+	CreatedAt() []string
 
-    // DeletedAt Add timestamp value of fields when DELETE.
-    DeletedAt() []string
+	// UpdatedAt Add timestamp value of fields when UPDATE.
+	UpdatedAt() []string
 
-    // AddExcept List of fields that must be excluded when INSERT.
-    AddExcept() []string
+	// DeletedAt Add timestamp value of fields when DELETE.
+	DeletedAt() []string
 
-    // ModExcept List of fields that must be excluded when UPDATE.
-    ModExcept() []string
+	// AddExcept List of fields that must be excluded when INSERT.
+	AddExcept() []string
 
-    // AddAt When INSERT, set the default timestamp.
-    AddAt(add *hey.Add, way ...*hey.Way)
+	// ModExcept List of fields that must be excluded when UPDATE.
+	ModExcept() []string
 
-    // ModAt When UPDATE, set the default timestamp.
-    ModAt(mod *hey.Mod, way ...*hey.Way)
+	// AddAt When INSERT, set the default timestamp.
+	AddAt(add *hey.Add, way ...*hey.Way)
 
-    // NotExistsIndex Get a list of non-existent fields.
-    NotExistsIndex(fields []string) []int
+	// ModAt When UPDATE, set the default timestamp.
+	ModAt(mod *hey.Mod, way ...*hey.Way)
 
-    // Exists Check whether the data exists.
-    Exists(fc func(get *hey.Get, f hey.Filter), way ...*hey.Way) (bool, error)
+	// NotExistsIndex Get a list of non-existent fields.
+	NotExistsIndex(columns []string) []int
 
-    // Insert For insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
-    Insert(insert interface{}, way ...*hey.Way) (int64, error)
+	// Exists Check whether the data exists.
+	Exists(fc func(get *hey.Get, f hey.Filter), way ...*hey.Way) (bool, error)
 
-    // Delete For delete data from table.
-    Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
+	// Insert For insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
+	Insert(insert interface{}, way ...*hey.Way) (int64, error)
 
-    // Update For update data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
-    Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
+	// Delete For delete data from table.
+	Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
 
-    // Select For select data from table.
-    Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
+	// Update For update data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
+	Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
 
-    // SelectGet For query data and write the query results to the result object.
-    SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
+	// Select For select data from table.
+	Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
 
-    // Count For count the total number of data in the current table according to the conditions.
-    Count(filter hey.Filter, way ...*hey.Way) (int64, error)
+	// SelectGet For query data and write the query results to the result object.
+	SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
 
-    // InsertMust The data must be successfully inserted into the table
-    InsertMust(insert interface{}, way ...*hey.Way) error
+	// Count For count the total number of data in the current table according to the conditions.
+	Count(filter hey.Filter, way ...*hey.Way) (int64, error)
 
-    // DeleteMust Delete at least one row from the table.
-    DeleteMust(filter hey.Filter, way ...*hey.Way) error
+	// InsertMust The data must be successfully inserted into the table
+	InsertMust(insert interface{}, way ...*hey.Way) error
 
-    // UpdateMust Update at least one row of data from the table.
-    UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
+	// DeleteMust Delete at least one row from the table.
+	DeleteMust(filter hey.Filter, way ...*hey.Way) error
+
+	// UpdateMust Update at least one row of data from the table.
+	UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
 }
 
-// HeyTableInsert Set the insert data of the specified table.
-func HeyTableInsert(table Table, add *hey.Add, insert interface{}) {
+// TableInsert Set the insert data of the specified table.
+func TableInsert(table Table, add *hey.Add, insert interface{}) {
 	if mp, ok := insert.(map[string]interface{}); ok {
 		for k, v := range mp {
-			if table.FieldExist(k) {
+			if table.ColumnExist(k) {
 				add.FieldValue(k, v)
 			}
 		}

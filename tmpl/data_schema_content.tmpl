@@ -16,7 +16,7 @@ import (
 type {{{.OriginNamePascal}}} struct {
 	schema *schema
 	gg *g.GoGroup
-	T *model.Hey{{{.OriginNamePascal}}}
+	T *model.{{{.OriginNamePascal}}}Schema
 	W *hey.Way
 }
 
@@ -24,7 +24,7 @@ type {{{.OriginNamePascal}}} struct {
 func New{{{.OriginNamePascal}}}(
 	ctx context.Context,
 	gg *g.GoGroup,
-	table *model.Hey{{{.OriginNamePascal}}},
+	table *model.{{{.OriginNamePascal}}}Schema,
 	way *hey.Way,
 ) (*{{{.OriginNamePascal}}}, error) {
 	s := &{{{.OriginNamePascal}}}{
@@ -36,8 +36,8 @@ func New{{{.OriginNamePascal}}}(
 	{
         s.schema.insertExceptColumns = s.AddExcept()
         s.schema.updateExceptColumns = s.ModExcept()
-        s.schema.insertPermitColumns = s.Field(s.schema.insertExceptColumns...)
-        s.schema.selectPermitColumns = s.Field(s.schema.selectExceptColumns...)
+        s.schema.insertPermitColumns = s.Column(s.schema.insertExceptColumns...)
+        s.schema.selectPermitColumns = s.Column(s.schema.selectExceptColumns...)
         s.schema.deleteFilter = s.F()
         s.schema.updateFilter = s.F()
         s.schema.selectFilter = s.F()
@@ -82,7 +82,7 @@ func (s *{{{.OriginNamePascal}}}) Mod(way ...*hey.Way) *hey.Mod {
 
 // Get new *Get object.
 func (s *{{{.OriginNamePascal}}}) Get(way ...*hey.Way) *hey.Get {
-	return AutoWay(s.W, way...).Get(s.T.Table()).Column(s.T.Field()...)
+	return AutoWay(s.W, way...).Get(s.T.Table()).Column(s.T.Column()...)
 }
 
 // Table Get the current instance table name.
@@ -90,45 +90,50 @@ func (s *{{{.OriginNamePascal}}}) Table() string {
     return s.T.Table()
 }
 
-// Field Get the field list of the current table(allow some fields to be ignored).
-func (s *{{{.OriginNamePascal}}}) Field(except ...string) []string {
-    return s.T.Field(except...)
+// Comment Get the current instance table comment.
+func (s *{{{.OriginNamePascal}}}) Comment() string {
+	return s.T.Comment()
 }
 
-// FieldMap Get the field of the current table map.
-func (s *{{{.OriginNamePascal}}}) FieldMap() map[string]*struct{} {
-	return s.T.FieldMap()
+// Column Get the column list of the current table(allow some columns to be ignored).
+func (s *{{{.OriginNamePascal}}}) Column(except ...string) []string {
+    return s.T.Column(except...)
 }
 
-// FieldExist Detect whether the current instance exists in a certain field.
-func (s *{{{.OriginNamePascal}}}) FieldExist(field string) bool {
-    return s.T.FieldExist(field)
+// ColumnMap Get the column of the current table map.
+func (s *{{{.OriginNamePascal}}}) ColumnMap() map[string]*struct{} {
+	return s.T.ColumnMap()
+}
+
+// ColumnExist Detect whether the current instance exists in a certain column.
+func (s *{{{.OriginNamePascal}}}) ColumnExist(field string) bool {
+    return s.T.ColumnExist(field)
 }
 
 // CreatedAt Insert timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) CreatedAt() []string {
-	return s.T.FieldCreatedAt()
+	return s.T.ColumnCreatedAt()
 }
 
 // UpdatedAt Update timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) UpdatedAt() []string {
-	return s.T.FieldUpdatedAt()
+	return s.T.ColumnUpdatedAt()
 }
 
 // DeletedAt Delete timestamp fields list(field value type: int4 or int8).
 func (s *{{{.OriginNamePascal}}}) DeletedAt() []string {
-	return s.T.FieldDeletedAt()
+	return s.T.ColumnDeletedAt()
 }
 
 // AddExcept List of fields to insert data to be ignored.
 func (s *{{{.OriginNamePascal}}}) AddExcept() []string {
-	return s.T.FieldAutoIncr()
+	return s.T.ColumnAutoIncr()
 }
 
 // ModExcept List of fields to update data to be ignored.
 func (s *{{{.OriginNamePascal}}}) ModExcept() (result []string) {
 	result = s.AddExcept()
-	result = append(result, s.T.FieldCreatedAt()...)
+	result = append(result, s.T.ColumnCreatedAt()...)
 	return
 }
 
@@ -155,23 +160,23 @@ func (s *{{{.OriginNamePascal}}}) ModAt(mod *hey.Mod, way ...*hey.Way) {
 func (s *{{{.OriginNamePascal}}}) NotExistsIndex(fields []string) []int {
 	result := make([]int, 0)
 	for k, v := range fields {
-		if !s.FieldExist(v) {
+		if !s.ColumnExist(v) {
 			result = append(result, k)
 		}
 	}
 	return result
 }
 
-// ExistsFields Get a list of existing fields.
-func (s *{{{.OriginNamePascal}}}) ExistsFields(fields ...string) []string {
-	length := len(fields)
-	result := make([]string, 0, length)
-	for i := 0; i < length; i++ {
-		if s.FieldExist(fields[i]) {
-			result = append(result, fields[i])
-		}
-	}
-	return result[:]
+// ExistsColumns Get a list of existing columns.
+func (s *{{{.OriginNamePascal}}}) ExistsColumns(columns ...string) []string {
+	length := len(columns)
+    result := make([]string, 0, length)
+    for i := 0; i < length; i++ {
+        if s.ColumnExist(columns[i]) {
+            result = append(result, columns[i])
+        }
+    }
+    return result[:]
 }
 
 // Exists Check whether the data exists.
@@ -186,7 +191,7 @@ func (s *{{{.OriginNamePascal}}}) Exists(fc func(get *hey.Get, f hey.Filter), wa
 
 // Insert Quickly insert data.
 func (s *{{{.OriginNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfInsert(func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}) { model.HeyTableInsert(s, add, insert) }, way...)
+	return s.SelfInsert(func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema) { model.TableInsert(s, add, insert) }, way...)
 }
 
 // Delete Quickly delete data.
@@ -196,7 +201,7 @@ func (s *{{{.OriginNamePascal}}}) Delete(filter hey.Filter, way ...*hey.Way) (in
 
 // Update Quickly update data.
 func (s *{{{.OriginNamePascal}}}) Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 		f.Use(filter)
         mod.Modify(update)
 	}, way...)
@@ -237,7 +242,7 @@ func (s *{{{.OriginNamePascal}}}) UpdateMust(filter hey.Filter, update map[strin
 }
 
 // SelfExists Check whether the data exists(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfExists(fc func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (bool, error) {
+func (s *{{{.OriginNamePascal}}}) SelfExists(fc func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (bool, error) {
 	query := s.Get(way...)
 	filter := s.F()
 	if fc != nil {
@@ -247,7 +252,7 @@ func (s *{{{.OriginNamePascal}}}) SelfExists(fc func(get *hey.Get, f hey.Filter,
 }
 
 // SelfInsert Quickly insert data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (int64, error) {
 	tmp := s.Add(way...).Except(s.AddExcept()...)
 	fc(tmp, s.T)
 	s.AddAt(tmp, way...)
@@ -255,7 +260,7 @@ func (s *{{{.OriginNamePascal}}}) SelfInsert(fc func(add *hey.Add, t *model.Hey{
 }
 
 // SelfDelete Quickly delete data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (int64, error) {
 	tmp := s.Del(way...)
 	where := s.F()
     fc(tmp, where, s.T)
@@ -266,7 +271,7 @@ func (s *{{{.OriginNamePascal}}}) SelfDelete(fc func(del *hey.Del, f hey.Filter,
 }
 
 // SelfUpdate Quickly update data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
+func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (int64, error) {
 	tmp := s.Mod(way...).Except(s.ModExcept()...)
 	where := s.F()
     fc(tmp, where, s.T)
@@ -278,7 +283,7 @@ func (s *{{{.OriginNamePascal}}}) SelfUpdate(fc func(mod *hey.Mod, f hey.Filter,
 }
 
 // SelfGetAll Quickly select all data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (result []*model.{{{.OriginNamePascal}}}, err error) {
 	tmp := s.Get(way...)
 	where := s.F()
     query(tmp, where, s.T)
@@ -290,8 +295,8 @@ func (s *{{{.OriginNamePascal}}}) SelfGetAll(query func(get *hey.Get, f hey.Filt
 }
 
 // SelfGetOne Quickly select one data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
-	tmp, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+	tmp, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 		query(get, f, t)
 		get.Limit(1)
 	}, way...)
@@ -305,7 +310,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOne(query func(get *hey.Get, f hey.Filt
 }
 
 // SelfSubGet Build query objects based on the current instance basic query(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
+func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema)) *hey.Get {
 	get := s.Get()
 	where := s.F()
     if query != nil {
@@ -318,22 +323,22 @@ func (s *{{{.OriginNamePascal}}}) SelfSubGet(query func(get *hey.Get, f hey.Filt
 }
 
 // SelfInsertMust Quickly insert data(affectedRows > 0, only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfInsertMust(fc func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfInsertMust(fc func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfInsert(fc, way...))
 }
 
 // SelfDeleteMust Quickly delete data(affectedRows > 0, only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfDeleteMust(fc func(del *hey.Del, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfDelete(fc, way...))
 }
 
 // SelfUpdateMust Quickly update data(affectedRows > 0, only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfUpdateMust(fc func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.SelfUpdate(fc, way...))
 }
 
 // SelfGetAllMust Quickly select all data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetAll(query, way...)
 	if err != nil {
 		return nil, err
@@ -345,7 +350,7 @@ func (s *{{{.OriginNamePascal}}}) SelfGetAllMust(query func(get *hey.Get, f hey.
 }
 
 // SelfGetOneMust Quickly select one data(only current instance).
-func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
 	tmp, err := s.SelfGetOne(query, way...)
 	if err != nil {
 		return nil, err
@@ -357,24 +362,24 @@ func (s *{{{.OriginNamePascal}}}) SelfGetOneMust(query func(get *hey.Get, f hey.
 }
 
 // SelfDeleteInsertAll Delete data and then insert in batches.
-func (s *{{{.OriginNamePascal}}}) SelfDeleteInsertAll(allData interface{}, where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) SelfDeleteInsertAll(allData interface{}, where func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), insert func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return s.SelfSelectDeleteInsertAll(allData, where, nil, nil, insert, way...)
 }
 
 // SelfSelectDeleteInsertAll Select data, delete data and then insert in batches.
 func (s *{{{.OriginNamePascal}}}) SelfSelectDeleteInsertAll(
 	allData interface{},
-	where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}),
-	query func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}),
+	where func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema),
+	query func(get *hey.Get, t *model.{{{.OriginNamePascal}}}Schema),
 	allList func(list []*model.{{{.OriginNamePascal}}}),
-	insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}),
+	insert func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema),
 	way ...*hey.Way,
 ) error {
 	filter := s.F()
 	where(filter, s.T)
 	return AutoWay(s.W, way...).TxTry(func(tx *hey.Way) error {
 		if query != nil && allList != nil {
-			list, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+			list, err := s.SelfGetAll(func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 				f.Use(filter)
 				query(get, t)
 			})
@@ -401,18 +406,18 @@ func (s *{{{.OriginNamePascal}}}) SelfSelectDeleteInsertAll(
 func (s *{{{.OriginNamePascal}}}) SelfUpdateInsertAll(
 	dataWhere []func() (
 		data interface{},
-		where func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}),
+		where func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema),
 	),
-	exists func(get *hey.Get, t *model.Hey{{{.OriginNamePascal}}}),
-	insert func(add *hey.Add, t *model.Hey{{{.OriginNamePascal}}}),
-	update func(mod *hey.Mod, t *model.Hey{{{.OriginNamePascal}}}),
+	exists func(get *hey.Get, t *model.{{{.OriginNamePascal}}}Schema),
+	insert func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema),
+	update func(mod *hey.Mod, t *model.{{{.OriginNamePascal}}}Schema),
 	way ...*hey.Way,
 ) error {
 	length := len(dataWhere)
 	if length == 0 {
 		return nil
 	}
-	fields := s.Field()
+	columns := s.Column()
 	return AutoWay(s.W, way...).TxTry(func(tx *hey.Way) error {
 		for i := 0; i < length; i++ {
 			if dataWhere[i] == nil {
@@ -427,11 +432,11 @@ func (s *{{{.OriginNamePascal}}}) SelfUpdateInsertAll(
 			if filter.IsEmpty() {
 				continue
 			}
-			has, err := s.SelfGetOne(func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+			has, err := s.SelfGetOne(func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 				if exists != nil {
 					exists(get, t)
 				} else {
-					get.Column(fields[0])
+					get.Column(columns[0])
 				}
 				f.Use(filter)
 			}, tx)
@@ -448,7 +453,7 @@ func (s *{{{.OriginNamePascal}}}) SelfUpdateInsertAll(
 					return err
 				}
 			} else {
-				_, err = s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+				_, err = s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 					if update != nil {
 						update(mod, t)
 					}
@@ -508,7 +513,7 @@ func (s *{{{.OriginNamePascal}}}) OfUpdateForbidMsg() string {
 
 
 // OfExists 检测数据是否存在 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfExists(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (bool, error) {
+func (s *{{{.OriginNamePascal}}}) OfExists(ctx context.Context, fc func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (bool, error) {
 	filter := s.F()
     if fc != nil {
         fc(filter, s.T)
@@ -556,8 +561,8 @@ func (s *{{{.OriginNamePascal}}}) OfInsertMust(ctx context.Context, insert inter
 }
 
 // OfDelete 删除数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfDelete(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
-	return s.SelfDelete(func(del *hey.Del, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+func (s *{{{.OriginNamePascal}}}) OfDelete(ctx context.Context, fc func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (int64, error) {
+	return s.SelfDelete(func(del *hey.Del, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
         del.Context(ctx)
         if fc != nil {
             fc(f, t)
@@ -569,13 +574,13 @@ func (s *{{{.OriginNamePascal}}}) OfDelete(ctx context.Context, fc func(f hey.Fi
 }
 
 // OfDeleteMust 必须成功删除数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfDeleteMust(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfDeleteMust(ctx context.Context, fc func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.OfDelete(ctx, fc, way...))
 }
 
 // OfUpdate 更新数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdate(ctx context.Context, fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (int64, error) {
-	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+func (s *{{{.OriginNamePascal}}}) OfUpdate(ctx context.Context, fc func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (int64, error) {
+	return s.SelfUpdate(func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 		mod.Context(ctx).Except(s.schema.updateExceptColumns...)
 		if fc != nil {
 			fc(mod, f, t)
@@ -587,23 +592,23 @@ func (s *{{{.OriginNamePascal}}}) OfUpdate(ctx context.Context, fc func(mod *hey
 }
 
 // OfUpdateMust 必须成功更新数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdateMust(ctx context.Context, fc func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfUpdateMust(ctx context.Context, fc func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.OfUpdate(ctx, fc, way...))
 }
 
 // OfUpdate1 更新数据(通过map或结构体更新) (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdate1(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), update interface{}, way ...*hey.Way) (int64, error) {
-	return s.OfUpdate(ctx, func(mod *hey.Mod, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}) {
+func (s *{{{.OriginNamePascal}}}) OfUpdate1(ctx context.Context, fc func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), update interface{}, way ...*hey.Way) (int64, error) {
+	return s.OfUpdate(ctx, func(mod *hey.Mod, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema) {
 		if modify, ok := update.(map[string]interface{}); ok {
 			for k, v := range modify {
-				if s.FieldExist(k) {
+				if s.ColumnExist(k) {
 					mod.Set(k, v)
 				}
 			}
 		} else {
 			fields, values := hey.StructModify(update, s.W.Tag(), s.schema.updateExceptColumns...)
 			for index, field := range fields {
-				if s.FieldExist(field) {
+				if s.ColumnExist(field) {
 					mod.Set(field, values[index])
 				}
 			}
@@ -615,22 +620,12 @@ func (s *{{{.OriginNamePascal}}}) OfUpdate1(ctx context.Context, fc func(f hey.F
 }
 
 // OfUpdate1Must 必须成功更新数据(通过map或结构体更新) (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdate1Must(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), update interface{}, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfUpdate1Must(ctx context.Context, fc func(f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), update interface{}, way ...*hey.Way) error {
 	return hey.MustAffectedRows(s.OfUpdate1(ctx, fc, update, way...))
 }
 
-// OfUpdate2 更新数据(通过数据比较更新) (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdate2(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), origin *model.{{{.OriginNamePascal}}}, latest *model.{{{.OriginNamePascal}}}, way ...*hey.Way) (int64, error) {
-	return s.OfUpdate1(ctx, fc, origin.COMPARE(latest), way...)
-}
-
-// OfUpdate2Must 必须成功更新数据(通过数据比较更新) (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfUpdate2Must(ctx context.Context, fc func(f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), origin *model.{{{.OriginNamePascal}}}, latest *model.{{{.OriginNamePascal}}}, way ...*hey.Way) error {
-	return hey.MustAffectedRows(s.OfUpdate2(ctx, fc, origin, latest, way...))
-}
-
 // OfSubGet 子查询对象 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSubGet(fc func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}})) *hey.Get {
+func (s *{{{.OriginNamePascal}}}) OfSubGet(fc func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema)) *hey.Get {
 	filter := s.F()
 	subQuery := s.Get().Column(s.schema.selectPermitColumns...)
 	if fc != nil {
@@ -641,7 +636,7 @@ func (s *{{{.OriginNamePascal}}}) OfSubGet(fc func(get *hey.Get, f hey.Filter, t
 }
 
 // OfSelect 查询数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelect(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), takeOut func(get *hey.Get) error, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfSelect(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), takeOut func(get *hey.Get) error, way ...*hey.Way) error {
 	filter := s.F()
 	get := s.Get(way...).Context(ctx).Column(s.schema.selectPermitColumns...)
 	if query != nil {
@@ -653,7 +648,7 @@ func (s *{{{.OriginNamePascal}}}) OfSelect(ctx context.Context, query func(get *
 }
 
 // OfSelectOne 查询一条数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectOne(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) OfSelectOne(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (*model.{{{.OriginNamePascal}}}, error) {
     result := make([]*model.{{{.OriginNamePascal}}}, 0)
     if err := s.OfSelect(ctx, query, func(get *hey.Get) error {
         return get.Limit(1).Get(&result)
@@ -667,7 +662,7 @@ func (s *{{{.OriginNamePascal}}}) OfSelectOne(ctx context.Context, query func(ge
 }
 
 // OfSelectAll 查询多条数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
+func (s *{{{.OriginNamePascal}}}) OfSelectAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) ([]*model.{{{.OriginNamePascal}}}, error) {
     result := make([]*model.{{{.OriginNamePascal}}}, 0)
     if err := s.OfSelect(ctx, query, func(get *hey.Get) error {
         return get.Get(&result)
@@ -678,14 +673,14 @@ func (s *{{{.OriginNamePascal}}}) OfSelectAll(ctx context.Context, query func(ge
 }
 
 // OfSelectGet 查询一条或多条数据, 通过反射把数据赋值到result (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectGet(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), result interface{}, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfSelectGet(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), result interface{}, way ...*hey.Way) error {
     return s.OfSelect(ctx, query, func(get *hey.Get) error {
         return get.Get(result)
     }, way...)
 }
 
 // OfSelectMap 查询一条或多条数据, 将数据存储到map[string]interface{}中 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectMap(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) ([]map[string]interface{}, error) {
+func (s *{{{.OriginNamePascal}}}) OfSelectMap(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) ([]map[string]interface{}, error) {
 	var result []map[string]interface{}
 	if err := s.OfSelect(ctx, query, func(get *hey.Get) error {
 		data, err := get.ViewMap()
@@ -701,7 +696,7 @@ func (s *{{{.OriginNamePascal}}}) OfSelectMap(ctx context.Context, query func(ge
 }
 
 // OfSelectMap1 查询一条或多条数据, 将数据存储到map[string]interface{}中, 单独处理空值[]map[string]interface{} (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectMap1(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) ([]map[string]interface{}, error) {
+func (s *{{{.OriginNamePascal}}}) OfSelectMap1(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) ([]map[string]interface{}, error) {
 	result, err := s.OfSelectMap(ctx, query, way...)
 	if err != nil {
 		return nil, err
@@ -713,21 +708,21 @@ func (s *{{{.OriginNamePascal}}}) OfSelectMap1(ctx context.Context, query func(g
 }
 
 // OfSelectScanOne 查询一条数据, 把查询到的数据依次扫描到dest列表(变量地址)中 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectScanOne(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), dest []interface{}, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfSelectScanOne(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), dest []interface{}, way ...*hey.Way) error {
     return s.OfSelect(ctx, query, func(get *hey.Get) error {
         return get.ScanOne(dest...)
     }, way...)
 }
 
 // OfSelectScanAll 查询多条数据, 把查询到的数据交给scanAll处理, scanAll应该一次扫描数据到对应的变量地址上 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfSelectScanAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), scanAll func(rows *sql.Rows) error, way ...*hey.Way) error {
+func (s *{{{.OriginNamePascal}}}) OfSelectScanAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), scanAll func(rows *sql.Rows) error, way ...*hey.Way) error {
     return s.OfSelect(ctx, query, func(get *hey.Get) error {
         return get.ScanAll(scanAll)
     }, way...)
 }
 
 // OfCount 统计数据总条数 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCount(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (count int64, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCount(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (count int64, err error) {
 	err = s.OfSelect(ctx, query, func(get *hey.Get) error {
 		count, err = get.Count()
 		return err
@@ -736,7 +731,7 @@ func (s *{{{.OriginNamePascal}}}) OfCount(ctx context.Context, query func(get *h
 }
 
 // OfCountSelect 统计数据总条数并查询数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCountSelect(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), takeOut func(get *hey.Get) error, way ...*hey.Way) (count int64, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCountSelect(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), takeOut func(get *hey.Get) error, way ...*hey.Way) (count int64, err error) {
     err = s.OfSelect(ctx, query, func(get *hey.Get) error {
         count, err = get.Count()
         if err != nil {
@@ -751,7 +746,7 @@ func (s *{{{.OriginNamePascal}}}) OfCountSelect(ctx context.Context, query func(
 }
 
 // OfCountSelectAll 统计数据总条数并查询多条数据 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCountSelectAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (count int64, result []*model.{{{.OriginNamePascal}}}, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCountSelectAll(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (count int64, result []*model.{{{.OriginNamePascal}}}, err error) {
     count, err = s.OfCountSelect(ctx, query, func(get *hey.Get) error {
         return get.Get(&result)
     }, way...)
@@ -759,7 +754,7 @@ func (s *{{{.OriginNamePascal}}}) OfCountSelectAll(ctx context.Context, query fu
 }
 
 // OfCountSelectGet 统计数据总条数并查询多条数据, 通过反射把数据赋值到result (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCountSelectGet(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), result interface{}, way ...*hey.Way) (count int64, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCountSelectGet(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), result interface{}, way ...*hey.Way) (count int64, err error) {
     count, err = s.OfCountSelect(ctx, query, func(get *hey.Get) error {
         return get.Get(&result)
     }, way...)
@@ -767,7 +762,7 @@ func (s *{{{.OriginNamePascal}}}) OfCountSelectGet(ctx context.Context, query fu
 }
 
 // OfCountSelectMap 统计数据总条数并查询多条数据, 将数据存储到map[string]interface{}中 (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCountSelectMap(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (count int64, result []map[string]interface{}, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCountSelectMap(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (count int64, result []map[string]interface{}, err error) {
     count, err = s.OfCountSelect(ctx, query, func(get *hey.Get) error {
         result, err = get.ViewMap()
         return err
@@ -776,7 +771,7 @@ func (s *{{{.OriginNamePascal}}}) OfCountSelectMap(ctx context.Context, query fu
 }
 
 // OfCountSelectMap1 统计数据总条数并查询多条数据, 将数据存储到map[string]interface{}中, 单独处理空值[]map[string]interface{} (with *schema).
-func (s *{{{.OriginNamePascal}}}) OfCountSelectMap1(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.Hey{{{.OriginNamePascal}}}), way ...*hey.Way) (count int64, result []map[string]interface{}, err error) {
+func (s *{{{.OriginNamePascal}}}) OfCountSelectMap1(ctx context.Context, query func(get *hey.Get, f hey.Filter, t *model.{{{.OriginNamePascal}}}Schema), way ...*hey.Way) (count int64, result []map[string]interface{}, err error) {
     count, result, err = s.OfCountSelectMap(ctx, query, way...)
     if err != nil {
         return 0, nil, err
