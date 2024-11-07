@@ -18,7 +18,7 @@ func Pgsql(app *App) Ber {
 }
 
 func (s *pgsql1) QueryAll() (err error) {
-	schema := s.app.TablePrefixName
+	schema := s.app.config.TableSchemaName
 	prepare := "SELECT table_schema, table_name FROM information_schema.tables WHERE ( table_schema = ? AND table_type = 'BASE TABLE' ) ORDER BY table_name ASC"
 	if err = s.app.way.TakeAll(&s.tables, prepare, schema); err != nil {
 		return

@@ -36,23 +36,21 @@ type Ber interface {
 type App struct {
 	Version string
 
-	Driver            string // 数据库驱动名称 mysql|postgres
-	DataSourceName    string // 数据源名称 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
-	TablePrefixName   string // 数据库前缀名称 public
-	PrefixPackageName string // 包导入前缀 main
-	TablePrefix       bool   // 表名是否使用前缀
-	FieldSerial       string // 表自动递增字段(只有一个字段自动递增)
-	FieldPrimaryKey   string // 表主键字段列表, 多个","隔开
-	FieldCreatedAt    string // 创建时间戳字段列表, 多个","隔开
-	FieldUpdatedAt    string // 更新时间戳字段列表, 多个","隔开
-	FieldDeletedAt    string // 删除时间戳字段列表, 多个","隔开
-	OutputDirectory   string // 输出路径
-	Admin             bool   // 管理端快速增删改代码
-	AdminUrlPrefix    string // 管理端路由前缀
-	Index             bool   // C端快速增删改代码
-	IndexUrlPrefix    string // C端路由前缀
+	config *Config
 
-	Identify string // 数据库标识符号 mysql: ` postgres: "
+	// TablePrefix     bool   // 表名是否使用前缀
+	// FieldSerial     string // 表自动递增字段(只有一个字段自动递增)
+	// FieldPrimaryKey string // 表主键字段列表, 多个","隔开
+	// FieldCreatedAt  string // 创建时间戳字段列表, 多个","隔开
+	// FieldUpdatedAt  string // 更新时间戳字段列表, 多个","隔开
+	// FieldDeletedAt  string // 删除时间戳字段列表, 多个","隔开
+	// OutputDirectory string // 输出路径
+	// Admin           bool   // 管理端快速增删改代码
+	// AdminUrlPrefix  string // 管理端路由前缀
+	// Index           bool   // C端快速增删改代码
+	// IndexUrlPrefix  string // C端路由前缀
+	//
+	// Identify string // 数据库标识符号 mysql: ` postgres: "
 
 	way *hey.Way // 数据库连接对象
 	ber Ber      // 数据接口
@@ -70,12 +68,12 @@ const (
 )
 
 func (s *App) TypeDriver() TypeDriver {
-	return TypeDriver(strings.ToLower(s.Driver))
+	return TypeDriver(strings.ToLower(s.config.Driver))
 }
 
 func (s *App) initial() error {
-	s.Driver = strings.TrimSpace(s.Driver)
-	conn, err := sql.Open(s.Driver, s.DataSourceName)
+	s.config.Driver = strings.TrimSpace(s.config.Driver)
+	conn, err := sql.Open(s.config.Driver, s.config.DataSourceName)
 	if err != nil {
 		return err
 	}
@@ -85,30 +83,30 @@ func (s *App) initial() error {
 	conn.SetConnMaxLifetime(time.Minute * 3)
 	switch s.TypeDriver() {
 	case DriverMysql:
-		s.Identify = "`"
+		s.config.DatabaseIdentify = "`"
 		s.way = hey.NewWay(conn)
 		s.ber = Mysql(s)
-		if s.TablePrefixName == "" {
-			start := strings.Index(s.DataSourceName, "/")
+		if s.config.TableSchemaName == "" {
+			start := strings.Index(s.config.DataSourceName, "/")
 			if start > -1 {
-				end := strings.Index(s.DataSourceName, "?")
+				end := strings.Index(s.config.DataSourceName, "?")
 				if end > -1 {
-					s.TablePrefixName = s.DataSourceName[start+1 : end]
+					s.config.TableSchemaName = s.config.DataSourceName[start+1 : end]
 				} else {
-					s.TablePrefixName = s.DataSourceName[start+1:]
+					s.config.TableSchemaName = s.config.DataSourceName[start+1:]
 				}
 			}
-			s.TablePrefixName = strings.TrimSpace(s.TablePrefixName)
+			s.config.TableSchemaName = strings.TrimSpace(s.config.TableSchemaName)
 		}
 	case DriverPostgres:
-		s.Identify = `"`
+		s.config.DatabaseIdentify = `"`
 		s.way = hey.NewWay(conn, hey.WithPrepare(pgsql.Prepare))
 		s.ber = Pgsql(s)
-		if s.TablePrefixName == "" {
-			s.TablePrefixName = "public"
+		if s.config.TableSchemaName == "" {
+			s.config.TableSchemaName = "public"
 		}
 	default:
-		return fmt.Errorf("unsupported driver name: %s", s.Driver)
+		return fmt.Errorf("unsupported driver name: %s", s.config.Driver)
 	}
 	return nil
 }
@@ -123,11 +121,27 @@ func (s *App) WriteFile(reader io.Reader, filename string) error {
 	return err
 }
 
+func (s *App) AllTable(all bool) []*SysTable {
+	if all {
+		return s.ber.AllTable()
+	}
+	allTable := s.ber.AllTable()
+	length := len(allTable)
+	result := make([]*SysTable, 0, length)
+	for i := 0; i < length; i++ {
+		if s.config.Disable(*allTable[i].TableName) {
+			continue
+		}
+		result = append(result, allTable[i])
+	}
+	return result
+}
+
 func (s *App) BuildAll() error {
 	if err := s.initial(); err != nil {
 		return err
 	}
-	if TypeDriver(s.Driver) == DriverPostgres {
+	if TypeDriver(s.config.Driver) == DriverPostgres {
 		if _, err := s.way.DB().Exec(pgsqlFuncCreate); err != nil {
 			return err
 		}
@@ -136,7 +150,7 @@ func (s *App) BuildAll() error {
 	if err := s.ber.QueryAll(); err != nil {
 		return err
 	}
-	for _, table := range s.ber.AllTable() {
+	for _, table := range s.AllTable(true) {
 		if err := s.ber.TableDdl(table); err != nil {
 			return err
 		}
@@ -145,10 +159,10 @@ func (s *App) BuildAll() error {
 	writer = append(writer, s.Model)
 	writer = append(writer, s.Data)
 	writer = append(writer, s.Biz)
-	if s.Admin {
+	if false { // todo...
 		writer = append(writer, s.Asc)
 	}
-	if s.Index {
+	if false { // todo...
 		writer = append(writer, s.Can)
 	}
 	for _, w := range writer {
@@ -279,8 +293,8 @@ func (s *SysTable) TmplTableModel() *TmplTableModel {
 		OriginNameCamel:      s.pascalSmall(),
 		Comment:              *s.TableName,
 	}
-	if s.app.TablePrefix && s.app.TablePrefixName != "" {
-		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.TablePrefixName, *s.TableName)
+	if s.app.config.UsingTableSchemaName && s.app.config.TableSchemaName != "" {
+		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.config.TableSchemaName, *s.TableName)
 	}
 	if s.TableComment != nil && *s.TableComment != "" {
 		tmp.Comment = *s.TableComment
@@ -298,7 +312,7 @@ func (s *SysTable) TmplTableData() *TmplTableData {
 		OriginNameWithPrefix: model.OriginNameWithPrefix,
 		OriginNameCamel:      model.OriginNameCamel,
 		Comment:              model.Comment,
-		PrefixPackage:        s.app.PrefixPackageName,
+		PrefixPackage:        s.app.config.ImportPrefixPackageName,
 	}
 }
 
@@ -312,7 +326,7 @@ func (s *SysTable) TmplTableBiz() *TmplTableBiz {
 		OriginNameWithPrefix: model.OriginNameWithPrefix,
 		OriginNameCamel:      model.OriginNameCamel,
 		Comment:              model.Comment,
-		PrefixPackage:        s.app.PrefixPackageName,
+		PrefixPackage:        s.app.config.ImportPrefixPackageName,
 	}
 }
 
@@ -326,7 +340,7 @@ func (s *SysTable) TmplTableAsc() *TmplTableAsc {
 		OriginNameWithPrefix: model.OriginNameWithPrefix,
 		OriginNameCamel:      model.OriginNameCamel,
 		Comment:              model.Comment,
-		PrefixPackage:        s.app.PrefixPackageName,
+		PrefixPackage:        s.app.config.ImportPrefixPackageName,
 		FileNamePrefix:       tableFilenamePrefix,
 	}
 }
@@ -341,7 +355,7 @@ func (s *SysTable) TmplTableCan() *TmplTableCan {
 		OriginNameWithPrefix: model.OriginNameWithPrefix,
 		OriginNameCamel:      model.OriginNameCamel,
 		Comment:              model.Comment,
-		PrefixPackage:        s.app.PrefixPackageName,
+		PrefixPackage:        s.app.config.ImportPrefixPackageName,
 		FileNamePrefix:       tableFilenamePrefix,
 	}
 }

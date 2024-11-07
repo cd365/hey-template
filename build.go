@@ -34,7 +34,7 @@ func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string)
 		return tmp
 	}
 	buffer := bytes.NewBuffer(nil)
-	for index, table := range s.ber.AllTable() {
+	for index, table := range s.AllTable(false) {
 		buffer.WriteString(newTable(index, table))
 	}
 	for _, v := range customLines {
@@ -49,7 +49,7 @@ func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string)
 	case "biz":
 		suffix = ".tmp"
 	}
-	filename := pathJoin(s.OutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
+	filename := pathJoin(s.config.TemplateOutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
 	if err := s.WriteFile(text, filename); err != nil {
 		return err
 	}
@@ -196,13 +196,13 @@ func (s *TmplTableModel) Make() {
 			}
 			return tmp
 		}
-		autoIncrement := fc(s.table.app.FieldSerial) // auto increment column
-		if s.table.TableFieldSerial != "" && s.table.app.FieldSerial != s.table.TableFieldSerial {
+		autoIncrement := fc(s.table.app.config.ColumnSerial) // auto increment column
+		if s.table.TableFieldSerial != "" && s.table.app.config.ColumnSerial != s.table.TableFieldSerial {
 			autoIncrement = append(autoIncrement, s.table.TableFieldSerial)
 		}
-		created := fc(strings.Split(s.table.app.FieldCreatedAt, ",")...) // created_at columns
-		updated := fc(strings.Split(s.table.app.FieldUpdatedAt, ",")...) // updated_at columns
-		deleted := fc(strings.Split(s.table.app.FieldDeletedAt, ",")...) // deleted_at columns
+		created := fc(strings.Split(s.table.app.config.ColumnCreatedAt, ",")...) // created_at columns
+		updated := fc(strings.Split(s.table.app.config.ColumnUpdatedAt, ",")...) // updated_at columns
+		deleted := fc(strings.Split(s.table.app.config.ColumnDeletedAt, ",")...) // deleted_at columns
 
 		ignore = append(ignore, autoIncrement[:]...)
 		ignore = append(ignore, created[:]...)
@@ -320,11 +320,11 @@ func (s *App) Model() error {
 	// model_schema.go
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
-	modelSchemaFilename := pathJoin(s.OutputDirectory, "model", "model_schema.go")
+	modelSchemaFilename := pathJoin(s.config.TemplateOutputDirectory, "model", "model_schema.go")
 	modelSchemaBuffer := bytes.NewBuffer(nil)
-	modelTableCreateFilename := pathJoin(s.OutputDirectory, "model", "table_create.sql")
+	modelTableCreateFilename := pathJoin(s.config.TemplateOutputDirectory, "model", "table_create.sql")
 	modelTableCreateBuffer := bytes.NewBuffer(nil)
-	for _, table := range s.ber.AllTable() {
+	for _, table := range s.AllTable(false) {
 		// for table ddl
 		{
 			ddl := table.DDL
@@ -350,7 +350,7 @@ func (s *App) Model() error {
 		if err := tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		modelSchemaContentFilename := pathJoin(s.OutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		modelSchemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err := s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
@@ -428,10 +428,10 @@ func (s *App) Data() error {
 	tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
 	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
 	tmpDataSchemaContentAab := NewTemplate("data_schema_content_aab", tmplDataSchemaContentAab)
-	tables := s.ber.AllTable()
+	tables := s.AllTable(false)
 	schema := &TmplTableDataSchema{
 		Version:       s.Version,
-		PrefixPackage: s.PrefixPackageName,
+		PrefixPackage: s.config.ImportPrefixPackageName,
 	}
 	for _, table := range tables {
 		tmp := table.TmplTableData()
@@ -439,12 +439,12 @@ func (s *App) Data() error {
 		if err := tmpDataSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		schemaContentFilename := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err := s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
 			return err
 		}
 
-		schemaContentFilenameAab := pathJoin(s.OutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
+		schemaContentFilenameAab := pathJoin(s.config.TemplateOutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
 		if _, err := os.Stat(schemaContentFilenameAab); err == nil {
 			schemaContentFilenameAab = tableFilenameGoTmp(schemaContentFilenameAab)
 		}
@@ -468,7 +468,7 @@ func (s *App) Data() error {
 		}
 	}
 
-	filename := pathJoin(s.OutputDirectory, "data", "data_schema.go")
+	filename := pathJoin(s.config.TemplateOutputDirectory, "data", "data_schema.go")
 	buffer := bytes.NewBuffer(nil)
 
 	length := len(tables)
@@ -498,14 +498,14 @@ func (s *App) Data() error {
 		return err
 	}
 
-	if s.Admin || s.Index {
+	if false || false {
 		// abc_schema.go
 		abcSchema := &TmplTableAbcSchema{
 			Version:       s.Version,
-			PrefixPackage: s.PrefixPackageName,
+			PrefixPackage: s.config.ImportPrefixPackageName,
 		}
 		tmpAbcSchema := NewTemplate("abc_schema", tmplAbcSchema)
-		abcFilename := pathJoin(s.OutputDirectory, "abc", "abc_schema.go")
+		abcFilename := pathJoin(s.config.TemplateOutputDirectory, "abc", "abc_schema.go")
 		abcBuffer := bytes.NewBuffer(nil)
 		if err := tmpAbcSchema.Execute(abcBuffer, abcSchema); err != nil {
 			return err
@@ -552,15 +552,15 @@ func (s *App) Biz() error {
 	buffer := bytes.NewBuffer(nil)
 	schema := &TmplTableBizSchema{
 		Version:       s.Version,
-		PrefixPackage: s.PrefixPackageName,
+		PrefixPackage: s.config.ImportPrefixPackageName,
 	}
-	for _, table := range s.ber.AllTable() {
+	for _, table := range s.AllTable(false) {
 		tmp := table.TmplTableBiz()
 		if err := tmpBizSchemaContent.Execute(buffer, tmp); err != nil {
 			return err
 		}
 	}
-	filename := pathJoin(s.OutputDirectory, "biz", "biz_schema.tmp")
+	filename := pathJoin(s.config.TemplateOutputDirectory, "biz", "biz_schema.tmp")
 	bizSchemaBuffer := bytes.NewBuffer(nil)
 	schema.AllTablesSchemaContent = buffer.String()
 	if err := tmpBizSchema.Execute(bizSchemaBuffer, schema); err != nil {
@@ -604,13 +604,13 @@ type TmplTableAscPseudoDelete struct {
 
 func (s *TmplTableAsc) Make() (buffer *bytes.Buffer, err error) {
 	buffer = bytes.NewBuffer(nil)
-	if s.table.app.FieldDeletedAt == "" {
+	if s.table.app.config.ColumnDeletedAt == "" {
 		return
 	}
 	if s.table.TableFieldSerial != hey.Id {
 		return
 	}
-	fields := strings.Split(s.table.app.FieldDeletedAt, ",")
+	fields := strings.Split(s.table.app.config.ColumnDeletedAt, ",")
 	splits := make([]string, 0, len(fields))
 	for _, v := range fields {
 		v = strings.TrimSpace(v)
@@ -656,10 +656,11 @@ func (s *App) Asc() error {
 		return err
 	}
 	tmpAscSchemaContent := NewTemplate("asc_schema_content", tmplAscSchemaContent)
-	tables := s.ber.AllTable()
+	tables := s.AllTable(false)
 	for _, table := range tables {
 		tmp := table.TmplTableAsc()
-		tmp.UrlPrefix = s.AdminUrlPrefix
+		// tmp.UrlPrefix = s.AdminUrlPrefix
+		tmp.UrlPrefix = "/api/v1/admin"
 
 		schemaContentBuffer := bytes.NewBuffer(nil)
 		customMethodBuffer, err := tmp.Make()
@@ -674,7 +675,7 @@ func (s *App) Asc() error {
 		}
 
 		// PREFIX_table_name_SUFFIX.go
-		schemaContentFilename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if _, err = os.Stat(schemaContentFilename); err == nil {
 			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
 		}
@@ -688,7 +689,7 @@ func (s *App) Asc() error {
 		if err = tmpAscSchemaContentBusinessGo.Execute(tmpAscSchemaContentBusinessGoBuffer, tmp); err != nil {
 			return err
 		}
-		schemaCustomAabFilename := pathJoin(s.OutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
+		schemaCustomAabFilename := pathJoin(s.config.TemplateOutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
 		if _, err = os.Stat(schemaCustomAabFilename); err == nil {
 			schemaCustomAabFilename = tableFilenameGoTmp(schemaCustomAabFilename)
 		}
@@ -739,12 +740,13 @@ func (s *App) Can() error {
 	tmpCanSchemaContent := NewTemplate("can_schema_content", tmplCanSchemaContent)
 	schema := &TmplTableCanSchema{
 		Version:       s.Version,
-		PrefixPackage: s.PrefixPackageName,
+		PrefixPackage: s.config.ImportPrefixPackageName,
 	}
-	tables := s.ber.AllTable()
+	tables := s.AllTable(false)
 	for _, table := range tables {
 		tmp := table.TmplTableCan()
-		tmp.UrlPrefix = s.IndexUrlPrefix
+		// tmp.UrlPrefix = s.IndexUrlPrefix
+		tmp.UrlPrefix = "/api/v1/index"
 
 		schemaContentBuffer := bytes.NewBuffer(nil)
 
@@ -753,7 +755,7 @@ func (s *App) Can() error {
 		}
 
 		// PREFIX_table_name_SUFFIX.go
-		schemaContentFilename := pathJoin(s.OutputDirectory, "can", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "can", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if _, err := os.Stat(schemaContentFilename); err == nil {
 			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
 		}
@@ -761,7 +763,7 @@ func (s *App) Can() error {
 			return err
 		}
 	}
-	filename := pathJoin(s.OutputDirectory, "can", "can_schema.go")
+	filename := pathJoin(s.config.TemplateOutputDirectory, "can", "can_schema.go")
 	buffer := bytes.NewBuffer(nil)
 	length := len(tables)
 	params := make([]string, 0, length)

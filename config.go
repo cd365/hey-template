@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
+	"regexp"
 )
 
 type Config struct {
@@ -25,10 +26,54 @@ type Config struct {
 
 	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"` // 模板文件输出路径
 
-	AllowTableNameMatchRules   []string `json:"allow_table_name_match_rules" yaml:"allow_table_name_match_rules"`     // 允许构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
-	DisableTableNameMatchRules []string `json:"disable_table_name_match_rules" yaml:"disable_table_name_match_rules"` // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
+	DisableTableNameMatchRules []string         `json:"disable_table_name_match_rules" yaml:"disable_table_name_match_rules"` // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
+	disableTableNameMatchRules []*regexp.Regexp // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
+
+	AllowTableName           []string         `json:"allow_table_name" yaml:"allow_table_name"`                         // 满足禁止构建中的某一条正则,但是又需要使用该表的情况,用于设置特定的表名 (优先级高于 DisableTableNameMatchRules)
+	AllowTableNameMatchRules []string         `json:"allow_table_name_match_rules" yaml:"allow_table_name_match_rules"` // 满足禁止构建中的某一条正则,但是又满足当前允许构建中的某一条正则 (优先级高于 DisableTableNameMatchRules)
+	allowTableNameMatchRules []*regexp.Regexp // 允许构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即无效 (AllowTableName 和 AllowTableNameMatchRules 可搭配使用, AllowTableName 优先使用)
 
 	DatabaseIdentify string `json:"-" yaml:"-"` // 数据库标识符号 mysql: ` postgres: "
+}
+
+func (s *Config) Initial() error {
+	for _, v := range s.DisableTableNameMatchRules {
+		tmpRegexp, err := regexp.Compile(v)
+		if err != nil {
+			return err
+		}
+		s.disableTableNameMatchRules = append(s.disableTableNameMatchRules, tmpRegexp)
+	}
+	for _, v := range s.AllowTableNameMatchRules {
+		tmpRegexp, err := regexp.Compile(v)
+		if err != nil {
+			return err
+		}
+		s.allowTableNameMatchRules = append(s.allowTableNameMatchRules, tmpRegexp)
+	}
+	return nil
+}
+
+func (s *Config) Disable(table string) bool {
+	if s.disableTableNameMatchRules == nil {
+		return false
+	}
+	for _, disable := range s.disableTableNameMatchRules {
+		if disable.MatchString(table) {
+			for _, allow := range s.AllowTableName {
+				if allow == table {
+					return false
+				}
+			}
+			for _, allow := range s.allowTableNameMatchRules {
+				if allow.MatchString(table) {
+					return false
+				}
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func SetConfig(configFile string) error {
@@ -38,22 +83,24 @@ func SetConfig(configFile string) error {
 	}
 	defer func() { _ = fil.Close() }()
 	config := &Config{
-		Version:                    "v0.0.1",
-		BuildAt:                    "20200303080000",
-		GitHash:                    "0000000000000000000000000000000000000000",
-		Driver:                     "postgres",
-		DataSourceName:             "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
-		TableSchemaName:            "public",
-		ImportPrefixPackageName:    "main",
-		UsingTableSchemaName:       true,
-		ColumnSerial:               "id",
-		ColumnCreatedAt:            "created_at,add_at",
-		ColumnUpdatedAt:            "updated_at,mod_at",
-		ColumnDeletedAt:            "deleted_at,del_at",
-		TemplateOutputDirectory:    "",
-		AllowTableNameMatchRules:   nil,
-		DisableTableNameMatchRules: nil,
-		DatabaseIdentify:           "\"",
+		Version:                 "v0.0.1",
+		BuildAt:                 "20200303080000",
+		GitHash:                 "0000000000000000000000000000000000000000",
+		Driver:                  "postgres",
+		DataSourceName:          "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
+		TableSchemaName:         "public",
+		ImportPrefixPackageName: "main",
+		UsingTableSchemaName:    true,
+		ColumnSerial:            "id",
+		ColumnCreatedAt:         "created_at,add_at",
+		ColumnUpdatedAt:         "updated_at,mod_at",
+		ColumnDeletedAt:         "deleted_at,del_at",
+		TemplateOutputDirectory: "",
+		DisableTableNameMatchRules: []string{
+			"^aaa_.*$",
+			"^zzz_.*$",
+		},
+		DatabaseIdentify: "\"",
 	}
 	encoder := yaml.NewEncoder(fil)
 	if err = encoder.Encode(config); err != nil {
@@ -70,7 +117,7 @@ func GetConfig(configFile string) (*Config, error) {
 	if stat.IsDir() {
 		return nil, fmt.Errorf("config file is a directory")
 	}
-	fil, err := os.OpenFile(configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	fil, err := os.OpenFile(configFile, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}

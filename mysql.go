@@ -22,7 +22,7 @@ func Mysql(app *App) Ber {
 }
 
 func (s *mysql1) QueryAll() (err error) {
-	schema := s.app.TablePrefixName
+	schema := s.app.config.TableSchemaName
 	prepare := "SELECT TABLE_SCHEMA AS table_schema, TABLE_NAME AS table_name, TABLE_COMMENT AS table_comment FROM information_schema.TABLES WHERE TABLE_TYPE = 'BASE TABLE' AND TABLE_SCHEMA = ? ORDER BY TABLE_NAME ASC;"
 	if err = s.app.way.TakeAll(&s.tables, prepare, schema); err != nil {
 		return
