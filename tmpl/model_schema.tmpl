@@ -4,110 +4,131 @@
 package model
 
 import (
-	"database/sql"
-
-	"github.com/cd365/hey"
+    "database/sql"
+	"github.com/cd365/hey/v2"
 )
 
-type Table interface {
-	// Add INSERT.
-	Add(way ...*hey.Way) *hey.Add
+var (
+    Way *hey.Way // data operation object, don't forget to assign it.
+)
 
-	// Del DELETE.
-	Del(way ...*hey.Way) *hey.Del
-
-	// Mod UPDATE.
-	Mod(way ...*hey.Way) *hey.Mod
-
-	// Get SELECT.
-	Get(way ...*hey.Way) *hey.Get
-
-	// Table Get table name.
-	Table() string
-
-	// Comment Get table comment.
-    Comment() string
-
-	// Column Get a list of columns.
-	Column(except ...string) []string
-
-	// ColumnMap Get columns map.
-	ColumnMap() map[string]*struct{}
-
-	// ColumnExist Does the column exist.
-	ColumnExist(column string) bool
-
-	// CreatedAt Add timestamp value of fields when INSERT.
-	CreatedAt() []string
-
-	// UpdatedAt Add timestamp value of fields when UPDATE.
-	UpdatedAt() []string
-
-	// DeletedAt Add timestamp value of fields when DELETE.
-	DeletedAt() []string
-
-	// AddExcept List of fields that must be excluded when INSERT.
-	AddExcept() []string
-
-	// ModExcept List of fields that must be excluded when UPDATE.
-	ModExcept() []string
-
-	// AddAt When INSERT, set the default timestamp.
-	AddAt(add *hey.Add, way ...*hey.Way)
-
-	// ModAt When UPDATE, set the default timestamp.
-	ModAt(mod *hey.Mod, way ...*hey.Way)
-
-	// NotExistsIndex Get a list of non-existent fields.
-	NotExistsIndex(columns []string) []int
-
-	// Exists Check whether the data exists.
-	Exists(fc func(get *hey.Get, f hey.Filter), way ...*hey.Way) (bool, error)
-
-	// Insert For insert data into the table. The inserted object type is usually map[string]interface{}, AnyStruct, *AnyStruct, []AnyStruct, []*AnyStruct.
-	Insert(insert interface{}, way ...*hey.Way) (int64, error)
-
-	// Delete For delete data from table.
-	Delete(filter hey.Filter, way ...*hey.Way) (int64, error)
-
-	// Update For update data from table. The object type being updated is usually map[string]interface{}, AnyStruct, *AnyStruct.
-	Update(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) (int64, error)
-
-	// Select For select data from table.
-	Select(get func(get *hey.Get), query func(rows *sql.Rows) error, way ...*hey.Way) error
-
-	// SelectGet For query data and write the query results to the result object.
-	SelectGet(get func(get *hey.Get), result interface{}, way ...*hey.Way) error
-
-	// Count For count the total number of data in the current table according to the conditions.
-	Count(filter hey.Filter, way ...*hey.Way) (int64, error)
-
-	// InsertMust The data must be successfully inserted into the table
-	InsertMust(insert interface{}, way ...*hey.Way) error
-
-	// DeleteMust Delete at least one row from the table.
-	DeleteMust(filter hey.Filter, way ...*hey.Way) error
-
-	// UpdateMust Update at least one row of data from the table.
-	UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
+// AutoSelectWay Get the last non-empty element.
+func AutoSelectWay(ways ...*hey.Way) *hey.Way {
+	for i := len(ways) - 1; i >= 0; i-- {
+		if ways[i] != nil {
+			return ways[i]
+		}
+	}
+	if Way != nil {
+        return Way
+    }
+    panic("model.Way is nil")
 }
 
-// TableInsert Set the insert data of the specified table.
-func TableInsert(table Table, add *hey.Add, insert interface{}) {
-	if mp, ok := insert.(map[string]interface{}); ok {
-		for k, v := range mp {
-			if table.ColumnExist(k) {
-				add.FieldValue(k, v)
-			}
-		}
-		return
+// MapValues Get all the values of the map.
+func MapValues[T interface{}, U comparable](m map[U]T) []T {
+	slice := make([]T, 0, len(m))
+	for _, v := range m {
+		slice = append(slice, v)
 	}
-	fields, values := hey.StructInsert(insert, add.Way().Tag(), table.AddExcept(), nil)
-	if index := table.NotExistsIndex(fields); len(index) > 0 {
-		fields = hey.RemoveSliceMemberByIndex(index, fields)
-		for k, v := range values {
-			values[k] = hey.RemoveSliceMemberByIndex(index, v)
-		}
+	return slice
+}
+
+// SliceToMap Slice to map.
+func SliceToMap[T interface{}, U comparable](slice []T, key func(tmp T) U) map[U]T {
+	length := len(slice)
+	m := make(map[U]T, length)
+	for i := 0; i < length; i++ {
+		m[key(slice[i])] = slice[i]
 	}
-	add.FieldsValues(fields, values)
+	return m
+}
+
+// ColumnValueIn Build column IN ( ... )
+func ColumnValueIn[T any](column string, value func(tmp T) interface{}, slice []T) hey.Filter {
+	filter := hey.F()
+	inValues := make([]interface{}, 0, len(slice))
+	for _, tmp := range slice {
+		inValues = append(inValues, value(tmp))
+	}
+	return filter.In(column, inValues...)
+}
+
+// RowsExists Check whether the data exists according to the conditions.
+func RowsExists(table string, column string, where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (exists bool, err error) {
+	get := AutoSelectWay(ways...).Get(table).Column(column).Where(where)
+	if custom != nil {
+		custom(get)
+	}
+	get.Limit(1)
+	err = get.ScanAll(func(rows *sql.Rows) error {
+		exists = rows.Next()
+		return nil
+	})
+	return
+}
+
+// RowsCount Total number of statistics according to the conditions.
+func RowsCount(table string, where hey.Filter, column ...string) (count int64, err error) {
+	return AutoSelectWay().Get(table).Where(where).Count(column...)
+}
+
+type Table interface {
+    Table() string
+	Comment() string
+	Column(except ...string) []string
+	ColumnExist(column string) bool
+	ColumnAutoIncr() []string
+	ColumnCreatedAt() []string
+	ColumnUpdatedAt() []string
+	ColumnDeletedAt() []string
+
+    Add(ways ...*hey.Way) *hey.Add
+    Del(ways ...*hey.Way) *hey.Del
+    Mod(ways ...*hey.Way) *hey.Mod
+    Get(ways ...*hey.Way) *hey.Get
+	Insert(create interface{}, ways ...*hey.Way) (int64, error)
+    Delete(where hey.Filter, ways ...*hey.Way) (int64, error)
+    Update(where hey.Filter, modify interface{}, ways ...*hey.Way) (int64, error)
+    SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error)
+}
+
+type AllTable struct {
+    schemaMap map[string]Table
+    schemaSlice []string
+	{{{.MapListDefine}}}
+}
+
+func NewAllTable() *AllTable {
+	tmp := &AllTable{
+		{{{.MapListAssign}}}
+	}
+	tmp.schemaMap = map[string]Table{
+        {{{.MapListStorage}}}
+    }
+    tmp.schemaSlice = []string{
+        {{{.MapListSlice}}}
+    }
+    return tmp
+}
+
+func (s *AllTable) TableMap() map[string]Table {
+	length := len(s.schemaMap)
+	result := make(map[string]Table, length)
+	for k, v := range s.schemaMap {
+		result[k] = v
+	}
+	return result
+}
+
+func (s *AllTable) TableSlice() []string {
+	length := len(s.schemaSlice)
+	result := make([]string, length)
+	_ = copy(result, s.schemaSlice)
+	return result
+}
+
+func (s *AllTable) TableExists(table string) bool {
+	_, ok := s.schemaMap[table]
+	return ok
 }

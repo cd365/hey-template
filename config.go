@@ -15,16 +15,18 @@ type Config struct {
 	Driver         string `json:"driver" yaml:"driver"`                     // 数据库驱动名称 mysql|postgres
 	DataSourceName string `json:"data_source_name" yaml:"data_source_name"` // 数据源地址 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
 
-	TableSchemaName         string `json:"table_schema_name" yaml:"table_schema_name"`                   // 数据库模式名称 mysql可以使用数据库名,pgsql可以使用schema名称 mysql默认空,pgsql默认public
-	ImportPrefixPackageName string `json:"import_prefix_package_name" yaml:"import_prefix_package_name"` // 导入包名前缀 默认main
-	UsingTableSchemaName    bool   `json:"use_table_schema_name" yaml:"use_table_schema_name"`           // 是否使用模式名称 在表名之前指定模式名称 如: public.account
+	TableSchemaName      string `json:"table_schema_name" yaml:"table_schema_name"`             // 数据库模式名称 mysql可以使用数据库名,pgsql可以使用schema名称 mysql默认空,pgsql默认public
+	UsingTableSchemaName bool   `json:"using_table_schema_name" yaml:"using_table_schema_name"` // 是否使用模式名称 在表名之前指定模式名称 如: public.account
 
 	ColumnSerial    string `json:"column_serial" yaml:"column_serial"`         // 表的序号字段(自动递增的字段) 数据库表本身应该具有唯一字段名 只能设置一个字段 通常是 id
 	ColumnCreatedAt string `json:"column_created_at" yaml:"column_created_at"` // 表数据创建时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnUpdatedAt string `json:"column_updated_at" yaml:"column_updated_at"` // 表数据更新时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnDeletedAt string `json:"column_deleted_at" yaml:"column_deleted_at"` // 表数据伪删除时间标记字段 通常是int或者int64类型 多个使用','隔开
 
-	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"` // 模板文件输出路径
+	UsingWire bool `json:"using_wire" yaml:"using_wire"` // 是否生成 github.com/google/wire 需要的 ProviderSet
+
+	ImportPrefixPackageName string `json:"import_prefix_package_name" yaml:"import_prefix_package_name"` // 导入包名前缀 默认main
+	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"`   // 模板文件输出路径
 
 	DisableTableNameMatchRules []string         `json:"disable_table_name_match_rules" yaml:"disable_table_name_match_rules"` // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
 	disableTableNameMatchRules []*regexp.Regexp // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制

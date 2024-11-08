@@ -3,36 +3,38 @@
 
 package model
 
+import (
+    "context"
+    "database/sql"
+	"github.com/cd365/hey/v2"
+)
+
 // {{{.OriginNamePascal}}} | {{{.OriginName}}} {{{if ne .Comment ""}}}| {{{.Comment}}}{{{end}}}
 type {{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumn}}}{{{$v}}}{{{end}}}
 }
 
-func (s *{{{.OriginNamePascal}}}) Schema() *{{{.OriginNamePascal}}}Schema {
-	return New{{{.OriginNamePascal}}}Schema()
-}
-
-type {{{.OriginNamePascal}}}Schema struct {
+type TableSchema{{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
-    fieldMap map[string]*struct{}
-    fieldSlice []string
+    columnMap map[string]*struct{}
+    columnSlice []string
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) Table() string {
+func (s *TableSchema{{{.OriginNamePascal}}}) Table() string {
 	return "{{{.OriginNameWithPrefix}}}"
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) Comment() string {
+func (s *TableSchema{{{.OriginNamePascal}}}) Comment() string {
 	return "{{{.Comment}}}"
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) Column(except ...string) []string {
+func (s *TableSchema{{{.OriginNamePascal}}}) Column(except ...string) []string {
 	excepted := make(map[string]*struct{})
     for _, v := range except {
         excepted[v] = &struct{}{}
     }
-    result := make([]string, 0, len(s.fieldSlice))
-    for _, v := range s.fieldSlice {
+    result := make([]string, 0, len(s.columnSlice))
+    for _, v := range s.columnSlice {
         if _, ok := excepted[v]; ok {
             continue
         }
@@ -41,52 +43,303 @@ func (s *{{{.OriginNamePascal}}}Schema) Column(except ...string) []string {
     return result
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnMap() map[string]*struct{} {
-	result := make(map[string]*struct{}, len(s.fieldMap))
-	for k, v := range s.fieldMap {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnMap() map[string]*struct{} {
+	result := make(map[string]*struct{}, len(s.columnMap))
+	for k, v := range s.columnMap {
 		result[k] = v
 	}
 	return result
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnString() string {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnString() string {
 	return {{{.StructColumnSchemaFieldSliceValue}}}
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnExist(field string) bool {
-	_, exist := s.fieldMap[field]
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnExist(column string) bool {
+	_, exist := s.columnMap[column]
 	return exist
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnAutoIncr() []string {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnAutoIncr() []string {
 	return {{{.ColumnAutoIncr}}}
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnCreatedAt() []string {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnCreatedAt() []string {
 	return {{{.ColumnCreatedAt}}}
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnUpdatedAt() []string {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnUpdatedAt() []string {
 	return {{{.ColumnUpdatedAt}}}
 }
 
-func (s *{{{.OriginNamePascal}}}Schema) ColumnDeletedAt() []string {
+func (s *TableSchema{{{.OriginNamePascal}}}) ColumnDeletedAt() []string {
 	return {{{.ColumnDeletedAt}}}
 }
 
-func New{{{.OriginNamePascal}}}Schema() *{{{.OriginNamePascal}}}Schema {
-	s := &{{{.OriginNamePascal}}}Schema{
+func (s *TableSchema{{{.OriginNamePascal}}}) Where(filters ...func(f hey.Filter, t *TableSchema{{{.OriginNamePascal}}})) hey.Filter {
+	filter := Way.F()
+	for _, tmp := range filters {
+		if tmp != nil {
+			tmp(filter, s)
+		}
+	}
+	return filter
+}
+
+func (s *TableSchema{{{.OriginNamePascal}}}) Add(ways ...*hey.Way) *hey.Add {
+	except := s.ColumnAutoIncr()
+	return AutoSelectWay(ways...).Add(s.Table()).Except(except...).Permit(s.Column(except...)...)
+}
+
+func (s *TableSchema{{{.OriginNamePascal}}}) Del(ways ...*hey.Way) *hey.Del {
+	return AutoSelectWay(ways...).Del(s.Table())
+}
+
+func (s *TableSchema{{{.OriginNamePascal}}}) Mod(ways ...*hey.Way) *hey.Mod {
+	except := s.ColumnAutoIncr()
+	except = append(except, s.ColumnCreatedAt()...)
+	return AutoSelectWay(ways...).Mod(s.Table()).Except(except...).Permit(s.Column(except...)...)
+}
+
+func (s *TableSchema{{{.OriginNamePascal}}}) Get(ways ...*hey.Way) *hey.Get {
+	return AutoSelectWay(ways...).Get(s.Table()).Column(s.Column()...)
+}
+
+// Insert SQL INSERT.
+func (s *TableSchema{{{.OriginNamePascal}}}) Insert(create interface{}, ways ...*hey.Way) (int64, error) {
+	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	defer cancel()
+	return s.Add(ways...).
+		Context(ctx).
+		Default(func(o *hey.Add) {
+			timestamp := o.Way().Now().Unix()
+			for _, v := range s.ColumnCreatedAt() {
+				o.FieldValue(v, timestamp)
+			}
+		}).
+		Create(create).
+		Add()
+}
+
+// Delete SQL DELETE.
+func (s *TableSchema{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*hey.Way) (int64, error) {
+	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	defer cancel()
+	return s.Del(ways...).
+		Context(ctx).
+		Where(where).
+		Del()
+}
+
+// Update SQL UPDATE.
+func (s *TableSchema{{{.OriginNamePascal}}}) Update(where hey.Filter, modify interface{}, ways ...*hey.Way) (int64, error) {
+	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	defer cancel()
+	return s.Mod(ways...).
+		Context(ctx).
+		Default(func(o *hey.Mod) {
+			timestamp := o.Way().Now().Unix()
+			for _, v := range s.ColumnUpdatedAt() {
+				o.Set(v, timestamp)
+			}
+		}).
+		Where(where).
+		Modify(modify).
+		Mod()
+}
+
+// InsertSelect SQL INSERT SELECT.
+func (s *TableSchema{{{.OriginNamePascal}}}) InsertSelect(column []string, get *hey.Get, ways ...*hey.Way) (int64, error) {
+	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	defer cancel()
+	return s.Add(ways...).Context(ctx).ValuesSubQueryGet(get, column...).Add()
+}
+
+// SelectCount SQL SELECT COUNT.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error) {
+	return s.Get(ways...).Where(where).Count()
+}
+
+// SelectQuery SQL SELECT.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), query func(rows *sql.Rows) error, ways ...*hey.Way) error {
+	get := s.Get(ways...).Where(where)
+	if custom != nil {
+		custom(get, s)
+	}
+	return get.Query(query)
+}
+
+// EmptySlice Initialize an empty slice.
+func (s *TableSchema{{{.OriginNamePascal}}}) EmptySlice() []*{{{.OriginNamePascal}}} {
+	return make([]*{{{.OriginNamePascal}}}, 0)
+}
+
+// SelectGet SQL SELECT.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) error {
+	get := s.Get(ways...).Where(where)
+	if custom != nil {
+		custom(get, s)
+	}
+	return get.Get(receive)
+}
+
+// SelectAll SQL SELECT ALL.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+	get := s.Get(ways...).Where(where)
+	if custom != nil {
+		custom(get, s)
+	}
+	all := make([]*{{{.OriginNamePascal}}}, 0)
+	err := get.Get(&all)
+	if err != nil {
+		return nil, err
+	}
+	return all, nil
+}
+
+// SelectOne SQL SELECT ONE.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}) {
+		if custom != nil {
+			custom(get, t)
+		}
+		get.Limit(1)
+	}, ways...)
+	if err != nil {
+		return nil, err
+	}
+	if len(all) == 0 {
+		return nil, nil
+	}
+	return all[0], nil
+}
+
+// SelectExists SQL SELECT EXISTS.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (bool, error) {
+	exists, err := s.SelectOne(where, func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}) {
+		if custom != nil {
+			custom(get, t)
+		}
+		get.Column(s.Column()[0])
+	}, ways...)
+	if err != nil {
+		return false, err
+	}
+	return exists != nil, nil
+}
+
+// SelectCountAll SQL SELECT COUNT + ALL.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (int64, []*{{{.OriginNamePascal}}}, error) {
+	total, err := s.SelectCount(where, ways...)
+	if err != nil {
+		return 0, nil, err
+	}
+	if total == 0 {
+		return 0, make([]*{{{.OriginNamePascal}}}, 0), nil
+	}
+	all, err := s.SelectAll(where, custom, ways...)
+	if err != nil {
+		return 0, nil, err
+	}
+	return total, all, nil
+}
+
+// SelectCountGet SQL SELECT COUNT + GET.
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) (int64, error) {
+	count, err := s.SelectCount(where, ways...)
+	if err != nil {
+		return 0, err
+	}
+	if count <= 0 {
+		return 0, nil
+	}
+	if err = s.SelectGet(where, custom, receive, ways...); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+// SelectAllMap Make map[string]*{{{.OriginNamePascal}}}
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) string, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[string]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, custom, ways...)
+	if err != nil {
+		return nil, nil, err
+	}
+	allMap := make(map[string]*{{{.OriginNamePascal}}}, len(all))
+	for _, v := range all {
+		allMap[makeMapKey(v)] = v
+	}
+	return allMap, all, nil
+}
+
+// SelectAllMapInt Make map[int]*{{{.OriginNamePascal}}}
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, custom, ways...)
+	if err != nil {
+		return nil, nil, err
+	}
+	allMap := make(map[int]*{{{.OriginNamePascal}}}, len(all))
+	for _, v := range all {
+		allMap[makeMapKey(v)] = v
+	}
+	return allMap, all, nil
+}
+
+// SelectAllMapInt64 Make map[int64]*{{{.OriginNamePascal}}}
+func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int64, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int64]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, custom, ways...)
+	if err != nil {
+		return nil, nil, err
+	}
+	allMap := make(map[int64]*{{{.OriginNamePascal}}}, len(all))
+	for _, v := range all {
+		allMap[makeMapKey(v)] = v
+	}
+	return allMap, all, nil
+}
+
+func NewTableSchema{{{.OriginNamePascal}}}() *TableSchema{{{.OriginNamePascal}}} {
+	s := &TableSchema{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
 	}
-	s.fieldMap = {{{.StructColumnSchemaValuesAccessMap}}}
-	s.fieldSlice = {{{.StructColumnSchemaValuesAccess}}}
+	s.columnMap = {{{.StructColumnSchemaValuesAccessMap}}}
+	s.columnSlice = {{{.StructColumnSchemaValuesAccess}}}
 	return s
 }
 
-type Add{{{.OriginNamePascal}}} struct {
+type {{{.OriginNamePascal}}}Insert struct {
 {{{range $k, $v := .StructColumnAdd}}}{{{$v}}}{{{end}}}
 }
 
-type Mod{{{.OriginNamePascal}}} struct {
+type {{{.OriginNamePascal}}}Update struct {
 {{{range $k, $v := .StructColumnMod}}}{{{$v}}}{{{end}}}
+}
+
+type RestfullApi{{{.OriginNamePascal}}}Insert struct {
+	Single   *{{{.OriginNamePascal}}}Insert   `json:"single" validate:"omitempty"`                  // Inserting a single record.
+	Multiple []*{{{.OriginNamePascal}}}Insert `json:"multiple" validate:"omitempty,min=1,max=1000"` // Insert multiple data.
+}
+
+func (s *RestfullApi{{{.OriginNamePascal}}}Insert) IsEmpty() bool {
+	return s.Single == nil && len(s.Multiple) == 0
+}
+
+type RestfullApi{{{.OriginNamePascal}}}Update struct {
+	Single   *{{{.OriginNamePascal}}}Update   `json:"single" validate:"omitempty"`                  // Updating a single record.
+	Multiple []*{{{.OriginNamePascal}}}Update `json:"multiple" validate:"omitempty,min=1,max=1000"` // Update multiple data.
+}
+
+func (s *RestfullApi{{{.OriginNamePascal}}}Update) IsEmpty() bool {
+	return s.Single == nil && len(s.Multiple) == 0
+}
+
+// RestfullApi{{{.OriginNamePascal}}}DeleteInsert
+// Batch update (based on a list of unique attribute values)
+// 1. Query
+// 2. Delete
+// 3. Replace new data field values with old field values. Example: latest.CreatedAt = old.CreatedAt
+// 4. Batch insert
+type RestfullApi{{{.OriginNamePascal}}}DeleteInsert struct {
+	Filter   hey.Filter `json:"-" validate:"-"`
+	Multiple []*{{{.OriginNamePascal}}}   `json:"multiple" validate:"omitempty"` // Save multiple data.
 }

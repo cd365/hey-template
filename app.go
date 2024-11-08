@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"os"
@@ -11,15 +10,13 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/cd365/hey/pgsql"
-
-	"github.com/cd365/hey"
+	"github.com/cd365/hey/v2"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
 
 const (
-	Version = "v0.5.0"
+	Version = "v0.6.0"
 )
 
 var (
@@ -27,7 +24,7 @@ var (
 	CommitHash = ""
 )
 
-type Ber interface {
+type Helper interface {
 	QueryAll() error
 	AllTable() []*SysTable
 	TableDdl(table *SysTable) error
@@ -36,24 +33,11 @@ type Ber interface {
 type App struct {
 	Version string
 
-	config *Config
-
-	// TablePrefix     bool   // 表名是否使用前缀
-	// FieldSerial     string // 表自动递增字段(只有一个字段自动递增)
-	// FieldPrimaryKey string // 表主键字段列表, 多个","隔开
-	// FieldCreatedAt  string // 创建时间戳字段列表, 多个","隔开
-	// FieldUpdatedAt  string // 更新时间戳字段列表, 多个","隔开
-	// FieldDeletedAt  string // 删除时间戳字段列表, 多个","隔开
-	// OutputDirectory string // 输出路径
-	// Admin           bool   // 管理端快速增删改代码
-	// AdminUrlPrefix  string // 管理端路由前缀
-	// Index           bool   // C端快速增删改代码
-	// IndexUrlPrefix  string // C端路由前缀
-	//
-	// Identify string // 数据库标识符号 mysql: ` postgres: "
+	cfg *Config
 
 	way *hey.Way // 数据库连接对象
-	ber Ber      // 数据接口
+
+	helper Helper // 数据接口
 }
 
 var cmd = &App{
@@ -68,45 +52,45 @@ const (
 )
 
 func (s *App) TypeDriver() TypeDriver {
-	return TypeDriver(strings.ToLower(s.config.Driver))
+	return TypeDriver(strings.ToLower(s.cfg.Driver))
 }
 
 func (s *App) initial() error {
-	s.config.Driver = strings.TrimSpace(s.config.Driver)
-	conn, err := sql.Open(s.config.Driver, s.config.DataSourceName)
+	s.cfg.Driver = strings.TrimSpace(s.cfg.Driver)
+	way, err := hey.NewWay(s.cfg.Driver, s.cfg.DataSourceName)
 	if err != nil {
 		return err
 	}
-	conn.SetMaxOpenConns(8)
-	conn.SetMaxIdleConns(2)
-	conn.SetConnMaxIdleTime(time.Minute * 3)
-	conn.SetConnMaxLifetime(time.Minute * 3)
+	s.way = way
+	db := way.DB()
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxIdleTime(time.Minute * 3)
+	db.SetConnMaxLifetime(time.Minute * 3)
 	switch s.TypeDriver() {
 	case DriverMysql:
-		s.config.DatabaseIdentify = "`"
-		s.way = hey.NewWay(conn)
-		s.ber = Mysql(s)
-		if s.config.TableSchemaName == "" {
-			start := strings.Index(s.config.DataSourceName, "/")
+		s.cfg.DatabaseIdentify = "`"
+		s.helper = Mysql(s)
+		if s.cfg.TableSchemaName == "" {
+			start := strings.Index(s.cfg.DataSourceName, "/")
 			if start > -1 {
-				end := strings.Index(s.config.DataSourceName, "?")
+				end := strings.Index(s.cfg.DataSourceName, "?")
 				if end > -1 {
-					s.config.TableSchemaName = s.config.DataSourceName[start+1 : end]
+					s.cfg.TableSchemaName = s.cfg.DataSourceName[start+1 : end]
 				} else {
-					s.config.TableSchemaName = s.config.DataSourceName[start+1:]
+					s.cfg.TableSchemaName = s.cfg.DataSourceName[start+1:]
 				}
 			}
-			s.config.TableSchemaName = strings.TrimSpace(s.config.TableSchemaName)
+			s.cfg.TableSchemaName = strings.TrimSpace(s.cfg.TableSchemaName)
 		}
 	case DriverPostgres:
-		s.config.DatabaseIdentify = `"`
-		s.way = hey.NewWay(conn, hey.WithPrepare(pgsql.Prepare))
-		s.ber = Pgsql(s)
-		if s.config.TableSchemaName == "" {
-			s.config.TableSchemaName = "public"
+		s.cfg.DatabaseIdentify = `"`
+		s.helper = Pgsql(s)
+		if s.cfg.TableSchemaName == "" {
+			s.cfg.TableSchemaName = "public"
 		}
 	default:
-		return fmt.Errorf("unsupported driver name: %s", s.config.Driver)
+		return fmt.Errorf("unsupported driver name: %s", s.cfg.Driver)
 	}
 	return nil
 }
@@ -123,13 +107,13 @@ func (s *App) WriteFile(reader io.Reader, filename string) error {
 
 func (s *App) AllTable(all bool) []*SysTable {
 	if all {
-		return s.ber.AllTable()
+		return s.helper.AllTable()
 	}
-	allTable := s.ber.AllTable()
+	allTable := s.helper.AllTable()
 	length := len(allTable)
 	result := make([]*SysTable, 0, length)
 	for i := 0; i < length; i++ {
-		if s.config.Disable(*allTable[i].TableName) {
+		if s.cfg.Disable(*allTable[i].TableName) {
 			continue
 		}
 		result = append(result, allTable[i])
@@ -141,30 +125,22 @@ func (s *App) BuildAll() error {
 	if err := s.initial(); err != nil {
 		return err
 	}
-	if TypeDriver(s.config.Driver) == DriverPostgres {
+	if TypeDriver(s.cfg.Driver) == DriverPostgres {
 		if _, err := s.way.DB().Exec(pgsqlFuncCreate); err != nil {
 			return err
 		}
 		defer func() { _, _ = s.way.DB().Exec(pgsqlFuncDrop) }()
 	}
-	if err := s.ber.QueryAll(); err != nil {
+	if err := s.helper.QueryAll(); err != nil {
 		return err
 	}
 	for _, table := range s.AllTable(true) {
-		if err := s.ber.TableDdl(table); err != nil {
+		if err := s.helper.TableDdl(table); err != nil {
 			return err
 		}
 	}
 	writer := make([]func() error, 0, 8)
 	writer = append(writer, s.Model)
-	writer = append(writer, s.Data)
-	writer = append(writer, s.Biz)
-	if false { // todo...
-		writer = append(writer, s.Asc)
-	}
-	if false { // todo...
-		writer = append(writer, s.Can)
-	}
 	for _, w := range writer {
 		if err := w(); err != nil {
 			return err
@@ -213,6 +189,10 @@ func pascal(name string) string {
 		next2upper = false
 	}
 	return string(tmp[:])
+}
+
+func upper(str string) string {
+	return strings.ToUpper(str)
 }
 
 func underline(str string) string {
@@ -293,71 +273,13 @@ func (s *SysTable) TmplTableModel() *TmplTableModel {
 		OriginNameCamel:      s.pascalSmall(),
 		Comment:              *s.TableName,
 	}
-	if s.app.config.UsingTableSchemaName && s.app.config.TableSchemaName != "" {
-		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.config.TableSchemaName, *s.TableName)
+	if s.app.cfg.UsingTableSchemaName && s.app.cfg.TableSchemaName != "" {
+		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.cfg.TableSchemaName, *s.TableName)
 	}
 	if s.TableComment != nil && *s.TableComment != "" {
 		tmp.Comment = *s.TableComment
 	}
 	return tmp
-}
-
-func (s *SysTable) TmplTableData() *TmplTableData {
-	model := s.TmplTableModel()
-	return &TmplTableData{
-		table:                s,
-		Version:              model.Version,
-		OriginName:           model.OriginName,
-		OriginNamePascal:     model.OriginNamePascal,
-		OriginNameWithPrefix: model.OriginNameWithPrefix,
-		OriginNameCamel:      model.OriginNameCamel,
-		Comment:              model.Comment,
-		PrefixPackage:        s.app.config.ImportPrefixPackageName,
-	}
-}
-
-func (s *SysTable) TmplTableBiz() *TmplTableBiz {
-	model := s.TmplTableModel()
-	return &TmplTableBiz{
-		table:                s,
-		Version:              model.Version,
-		OriginName:           model.OriginName,
-		OriginNamePascal:     model.OriginNamePascal,
-		OriginNameWithPrefix: model.OriginNameWithPrefix,
-		OriginNameCamel:      model.OriginNameCamel,
-		Comment:              model.Comment,
-		PrefixPackage:        s.app.config.ImportPrefixPackageName,
-	}
-}
-
-func (s *SysTable) TmplTableAsc() *TmplTableAsc {
-	model := s.TmplTableModel()
-	return &TmplTableAsc{
-		table:                s,
-		Version:              model.Version,
-		OriginName:           model.OriginName,
-		OriginNamePascal:     model.OriginNamePascal,
-		OriginNameWithPrefix: model.OriginNameWithPrefix,
-		OriginNameCamel:      model.OriginNameCamel,
-		Comment:              model.Comment,
-		PrefixPackage:        s.app.config.ImportPrefixPackageName,
-		FileNamePrefix:       tableFilenamePrefix,
-	}
-}
-
-func (s *SysTable) TmplTableCan() *TmplTableCan {
-	model := s.TmplTableModel()
-	return &TmplTableCan{
-		table:                s,
-		Version:              model.Version,
-		OriginName:           model.OriginName,
-		OriginNamePascal:     model.OriginNamePascal,
-		OriginNameWithPrefix: model.OriginNameWithPrefix,
-		OriginNameCamel:      model.OriginNameCamel,
-		Comment:              model.Comment,
-		PrefixPackage:        s.app.config.ImportPrefixPackageName,
-		FileNamePrefix:       tableFilenamePrefix,
-	}
 }
 
 // SysColumn 表字段结构
@@ -428,6 +350,13 @@ func (s *SysColumn) pascalSmall() string {
 		return ""
 	}
 	return strings.ToLower(name[0:1]) + name[1:]
+}
+
+func (s *SysColumn) upper() string {
+	if s.ColumnName == nil {
+		return ""
+	}
+	return upper(*s.ColumnName)
 }
 
 func (s *SysColumn) comment() string {

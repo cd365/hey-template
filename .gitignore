@@ -1,12 +1,7 @@
 .idea
 .vscode
-abc
-asc
-biz
-can
-data
+db
 model
-structs
 vendor
 hey-template
 *.yaml

@@ -1,0 +1,17 @@
+// hey-template version: {{{.Version}}}
+// TEMPLATE CODE DO NOT EDIT IT.
+
+package model
+
+import (
+	"context"
+	"time"
+)
+
+var (
+	// Context do sql default context.
+	Context = context.Background()
+
+	// DoSqlTimeout do sql timeout.
+    DoSqlTimeout = time.Second * 5
+)

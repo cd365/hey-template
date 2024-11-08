@@ -61,7 +61,7 @@ func main() {
 		return
 	}
 
-	cmd.config = config
+	cmd.cfg = config
 
 	if err = cmd.BuildAll(); err != nil {
 		fmt.Println(err.Error())

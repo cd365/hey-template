@@ -3,10 +3,9 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/cd365/hey"
+	"github.com/cd365/hey/v2"
 )
 
 type TmplWire struct {
@@ -49,7 +48,7 @@ func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string)
 	case "biz":
 		suffix = ".tmp"
 	}
-	filename := pathJoin(s.config.TemplateOutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
+	filename := pathJoin(s.cfg.TemplateOutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
 	if err := s.WriteFile(text, filename); err != nil {
 		return err
 	}
@@ -105,9 +104,9 @@ func (s *TmplTableModel) Make() {
 		s.StructColumn = append(s.StructColumn, tmp)
 	}
 
-	// hey
+	// schema
 	for i, c := range s.table.Column {
-		tmp := fmt.Sprintf("\t%s string", c.pascal())
+		tmp := fmt.Sprintf("\t%s string", strings.ToUpper(*c.ColumnName))
 		comment := c.comment()
 		if comment != "" {
 			tmp = fmt.Sprintf("%s // %s", tmp, comment)
@@ -125,13 +124,13 @@ func (s *TmplTableModel) Make() {
 		fieldAccess := make([]string, 0, lengthColumn)
 		for i, c := range s.table.Column {
 			field = append(field, fmt.Sprintf("\"%s\"", *c.ColumnName))
-			fieldPascalName := c.pascal()
-			fieldAccessTmp := fmt.Sprintf("s.%s,", fieldPascalName)
+			upperName := c.upper()
+			fieldAccessTmp := fmt.Sprintf("s.%s,", upperName)
 			if c.ColumnComment != nil {
 				fieldAccessTmp = fmt.Sprintf("%s // %s", fieldAccessTmp, *c.ColumnComment)
 			}
 			fieldAccess = append(fieldAccess, fieldAccessTmp)
-			tmp := fmt.Sprintf("\t\t%s:\"%s\",", fieldPascalName, *c.ColumnName)
+			tmp := fmt.Sprintf("\t\t%s:\"%s\",", upperName, *c.ColumnName)
 			comment := c.comment()
 			if comment != "" {
 				tmp = fmt.Sprintf("%s // %s", tmp, comment)
@@ -196,13 +195,13 @@ func (s *TmplTableModel) Make() {
 			}
 			return tmp
 		}
-		autoIncrement := fc(s.table.app.config.ColumnSerial) // auto increment column
-		if s.table.TableFieldSerial != "" && s.table.app.config.ColumnSerial != s.table.TableFieldSerial {
+		autoIncrement := fc(s.table.app.cfg.ColumnSerial) // auto increment column
+		if s.table.TableFieldSerial != "" && s.table.app.cfg.ColumnSerial != s.table.TableFieldSerial {
 			autoIncrement = append(autoIncrement, s.table.TableFieldSerial)
 		}
-		created := fc(strings.Split(s.table.app.config.ColumnCreatedAt, ",")...) // created_at columns
-		updated := fc(strings.Split(s.table.app.config.ColumnUpdatedAt, ",")...) // updated_at columns
-		deleted := fc(strings.Split(s.table.app.config.ColumnDeletedAt, ",")...) // deleted_at columns
+		created := fc(strings.Split(s.table.app.cfg.ColumnCreatedAt, ",")...) // created_at columns
+		updated := fc(strings.Split(s.table.app.cfg.ColumnUpdatedAt, ",")...) // updated_at columns
+		deleted := fc(strings.Split(s.table.app.cfg.ColumnDeletedAt, ",")...) // deleted_at columns
 
 		ignore = append(ignore, autoIncrement[:]...)
 		ignore = append(ignore, created[:]...)
@@ -215,7 +214,7 @@ func (s *TmplTableModel) Make() {
 		ignore = append(ignore, deleted[:]...)
 
 		if len(autoIncrement) > 0 && autoIncrement[0] != "" {
-			s.ColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", pascal(autoIncrement[0]))
+			s.ColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", upper(autoIncrement[0]))
 		} else {
 			s.ColumnAutoIncr = "nil"
 		}
@@ -225,7 +224,7 @@ func (s *TmplTableModel) Make() {
 				return "nil"
 			}
 			for i := 0; i < length; i++ {
-				cols[i] = fmt.Sprintf("s.%s", pascal(cols[i]))
+				cols[i] = fmt.Sprintf("s.%s", upper(cols[i]))
 			}
 			return fmt.Sprintf("[]string{ %s }", strings.Join(cols, ", "))
 		}
@@ -312,24 +311,53 @@ func (s *TmplTableModel) Make() {
 
 }
 
+type TmplTableModelSchema struct {
+	Version string // 模板版本
+
+	PrefixPackage string // 包导入前缀
+
+	// data
+	MapListDefine  string // data_schema.go tables define
+	MapListAssign  string // data_schema.go tables assign
+	MapListStorage string // data_schema.go tables storage
+	MapListSlice   string // data_schema.go tables slice
+}
+
 func (s *App) Model() error {
-	// model.go
-	if err := s.MakeTmplWire("model", "Schema"); err != nil {
-		return err
+	if s.cfg.UsingWire {
+		// model.go
+		if err := s.MakeTmplWire("model", "Schema", "\n\tNewSchemaAll, // schema all"); err != nil {
+			return err
+		}
 	}
+
+	tables := s.AllTable(false)
+
 	// model_schema.go
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
+	tmpModelSchemaCustom := NewTemplate("tmpl_model_schema_custom", tmplModelSchemaCustom)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
-	modelSchemaFilename := pathJoin(s.config.TemplateOutputDirectory, "model", "model_schema.go")
+	modelSchemaFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "model_schema.go")
+	modelSchemaCustomFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "model_schema_custom.go")
 	modelSchemaBuffer := bytes.NewBuffer(nil)
-	modelTableCreateFilename := pathJoin(s.config.TemplateOutputDirectory, "model", "table_create.sql")
+	modelSchemaCustomBuffer := bytes.NewBuffer(nil)
+	modelTableCreateFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "aaa_table_create.sql")
 	modelTableCreateBuffer := bytes.NewBuffer(nil)
-	for _, table := range s.AllTable(false) {
+
+	for index, table := range tables {
 		// for table ddl
 		{
 			ddl := table.DDL
 			for strings.HasSuffix(ddl, "\n") {
 				ddl = strings.TrimSuffix(ddl, "\n")
+			}
+			if index > 0 {
+				if _, err := modelTableCreateBuffer.WriteString("\n\n\n\n"); err != nil {
+					return err
+				}
+			}
+			if _, err := modelTableCreateBuffer.WriteString(fmt.Sprintf("/* %s (%s) */\n", *table.TableName, *table.TableComment)); err != nil {
+				return err
 			}
 			if _, err := modelTableCreateBuffer.WriteString(ddl); err != nil {
 				return err
@@ -339,9 +367,6 @@ func (s *App) Model() error {
 					return err
 				}
 			}
-			if _, err := modelTableCreateBuffer.WriteString("\n"); err != nil {
-				return err
-			}
 		}
 		// table
 		modelSchemaContentBuffer := bytes.NewBuffer(nil)
@@ -350,440 +375,62 @@ func (s *App) Model() error {
 		if err := tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		modelSchemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		modelSchemaContentFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err := s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
 
 	}
+
 	// model_schema.go
-	if err := tmpModelSchema.Execute(modelSchemaBuffer, s); err != nil {
-		return err
-	}
-	if err := s.WriteFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
-		return err
-	}
-	// table_create.sql
-	if err := s.WriteFile(modelTableCreateBuffer, modelTableCreateFilename); err != nil {
-		return err
-	}
-	return nil
-}
-
-type TmplTableDataSchema struct {
-	Version string // 模板版本
-
-	PrefixPackage string // 包导入前缀
-
-	// data
-	MapListDefine  string // data_schema.go tables define
-	MapListParams  string // data_schema.go tables params
-	MapListAssign  string // data_schema.go tables assign
-	MapListStorage string // data_schema.go tables storage
-	MapListSlice   string // data_schema.go tables slice
-}
-
-type TmplTableDataSchemaAab struct {
-	Version string // 模板版本
-
-	OriginName           string // 原始表名称
-	OriginNamePascal     string // 原始表名称(帕斯卡命名)
-	OriginNameWithPrefix string // 原始表名称
-	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
-	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	PrefixPackage string // 包导入前缀
-}
-
-type TmplTableData struct {
-	table *SysTable
-
-	Version string // 模板版本
-
-	OriginName           string // 原始表名称
-	OriginNamePascal     string // 原始表名称(帕斯卡命名)
-	OriginNameWithPrefix string // 原始表名称
-	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
-	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	PrefixPackage string // 包导入前缀
-}
-
-type TmplTableAbcSchema struct {
-	Version string // 模板版本
-
-	PrefixPackage string // 包导入前缀
-}
-
-func (s *App) Data() error {
-	// data.go
-	if err := s.MakeTmplWire(
-		"data",
-		"",
-		"\n\tNewTables, // all instances",
-	); err != nil {
-		return err
-	}
-	// data_schema.go
-	tmpDataSchema := NewTemplate("data_schema", tmplDataSchema)
-	tmpDataSchemaContent := NewTemplate("data_schema_content", tmplDataSchemaContent)
-	tmpDataSchemaContentAab := NewTemplate("data_schema_content_aab", tmplDataSchemaContentAab)
-	tables := s.AllTable(false)
-	schema := &TmplTableDataSchema{
-		Version:       s.Version,
-		PrefixPackage: s.config.ImportPrefixPackageName,
-	}
-	for _, table := range tables {
-		tmp := table.TmplTableData()
-		schemaContentBuffer := bytes.NewBuffer(nil)
-		if err := tmpDataSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
-			return err
-		}
-		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
-		if err := s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
-			return err
-		}
-
-		schemaContentFilenameAab := pathJoin(s.config.TemplateOutputDirectory, "data", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
-		if _, err := os.Stat(schemaContentFilenameAab); err == nil {
-			schemaContentFilenameAab = tableFilenameGoTmp(schemaContentFilenameAab)
-		}
-		tmpAab := &TmplTableDataSchemaAab{
-			Version: tmp.Version,
-
-			OriginName:           tmp.OriginName,
-			OriginNamePascal:     tmp.OriginNamePascal,
-			OriginNameWithPrefix: tmp.OriginNameWithPrefix,
-			OriginNameCamel:      tmp.OriginNameCamel,
-			Comment:              tmp.Comment,
-
-			PrefixPackage: tmp.PrefixPackage,
-		}
-		schemaContentBufferAab := bytes.NewBuffer(nil)
-		if err := tmpDataSchemaContentAab.Execute(schemaContentBufferAab, tmpAab); err != nil {
-			return err
-		}
-		if err := s.WriteFile(schemaContentBufferAab, schemaContentFilenameAab); err != nil {
-			return err
-		}
-	}
-
-	filename := pathJoin(s.config.TemplateOutputDirectory, "data", "data_schema.go")
-	buffer := bytes.NewBuffer(nil)
-
-	length := len(tables)
-	defines := make([]string, 0, length)
-	params := make([]string, 0, length)
-	assigns := make([]string, 0, length)
-	storage := make([]string, 0, length)
-	slice := make([]string, 0, length)
-	for _, table := range tables {
-		namePascal := table.pascal()
-		namePascalSmall := table.pascalSmall()
-		defines = append(defines, fmt.Sprintf("%s *%s", namePascal, namePascal))
-		params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
-		assigns = append(assigns, fmt.Sprintf("%s: %s,", namePascal, namePascalSmall))
-		storage = append(storage, fmt.Sprintf("%s.Table(): %s,", namePascalSmall, namePascalSmall))
-		slice = append(slice, fmt.Sprintf("%s.Table(),", namePascalSmall))
-	}
-	schema.MapListDefine = strings.Join(defines, "\n\t")
-	schema.MapListParams = strings.Join(params, "\n\t")
-	schema.MapListAssign = strings.Join(assigns, "\n\t\t")
-	schema.MapListStorage = strings.Join(storage, "\n\t\t")
-	schema.MapListSlice = strings.Join(slice, "\n\t\t")
-	if err := tmpDataSchema.Execute(buffer, schema); err != nil {
-		return err
-	}
-	if err := s.WriteFile(buffer, filename); err != nil {
-		return err
-	}
-
-	if false || false {
-		// abc_schema.go
-		abcSchema := &TmplTableAbcSchema{
+	{
+		schema := &TmplTableModelSchema{
 			Version:       s.Version,
-			PrefixPackage: s.config.ImportPrefixPackageName,
+			PrefixPackage: s.cfg.ImportPrefixPackageName,
 		}
-		tmpAbcSchema := NewTemplate("abc_schema", tmplAbcSchema)
-		abcFilename := pathJoin(s.config.TemplateOutputDirectory, "abc", "abc_schema.go")
-		abcBuffer := bytes.NewBuffer(nil)
-		if err := tmpAbcSchema.Execute(abcBuffer, abcSchema); err != nil {
+		length := len(tables)
+		defines := make([]string, 0, length)
+		assigns := make([]string, 0, length)
+		storage := make([]string, 0, length)
+		slice := make([]string, 0, length)
+		schemaName := "TableSchema"
+		for _, table := range tables {
+			namePascal := table.pascal()
+			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaName, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(),", namePascal, schemaName, namePascal))
+			storage = append(storage, fmt.Sprintf("tmp.%s.Table(): tmp.%s,", namePascal, namePascal))
+			slice = append(slice, fmt.Sprintf("tmp.%s.Table(),", namePascal))
+		}
+		schema.MapListDefine = strings.Join(defines, "\n\t")
+		schema.MapListAssign = strings.Join(assigns, "\n\t\t")
+		schema.MapListStorage = strings.Join(storage, "\n\t\t")
+		schema.MapListSlice = strings.Join(slice, "\n\t\t")
+		if err := tmpModelSchema.Execute(modelSchemaBuffer, schema); err != nil {
 			return err
 		}
-		if err := s.WriteFile(abcBuffer, abcFilename); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-type TmplTableBizSchema struct {
-	Version string // 模板版本
-
-	PrefixPackage string // 包导入前缀
-
-	// biz
-	AllTablesSchemaContent string // biz.go data all tables schema content
-}
-
-type TmplTableBiz struct {
-	table *SysTable
-
-	Version string // 模板版本
-
-	OriginName           string // 原始表名称
-	OriginNamePascal     string // 原始表名称(帕斯卡命名)
-	OriginNameWithPrefix string // 原始表名称
-	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
-	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	PrefixPackage string // 包导入前缀
-}
-
-func (s *App) Biz() error {
-	// biz.go
-	if err := s.MakeTmplWire("biz", ""); err != nil {
-		return err
-	}
-	// biz_schema.tmpl
-	tmpBizSchema := NewTemplate("biz_schema", tmplBizSchema)
-	tmpBizSchemaContent := NewTemplate("biz_schema_content", tmplBizSchemaContent)
-	buffer := bytes.NewBuffer(nil)
-	schema := &TmplTableBizSchema{
-		Version:       s.Version,
-		PrefixPackage: s.config.ImportPrefixPackageName,
-	}
-	for _, table := range s.AllTable(false) {
-		tmp := table.TmplTableBiz()
-		if err := tmpBizSchemaContent.Execute(buffer, tmp); err != nil {
-			return err
-		}
-	}
-	filename := pathJoin(s.config.TemplateOutputDirectory, "biz", "biz_schema.tmp")
-	bizSchemaBuffer := bytes.NewBuffer(nil)
-	schema.AllTablesSchemaContent = buffer.String()
-	if err := tmpBizSchema.Execute(bizSchemaBuffer, schema); err != nil {
-		return err
-	}
-	if err := s.WriteFile(bizSchemaBuffer, filename); err != nil {
-		return err
-	}
-	return nil
-}
-
-type TmplTableAsc struct {
-	table *SysTable
-
-	Version string // 模板版本
-
-	OriginName           string // 原始表名称
-	OriginNamePascal     string // 原始表名称(帕斯卡命名)
-	OriginNameWithPrefix string // 原始表名称
-	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
-	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	PrefixPackage string // 包导入前缀
-
-	UrlPrefix string // 路由前缀
-
-	PseudoDelete string // 移动到回收站功能(伪删除)
-
-	CustomMethod string // asc custom methods
-
-	FileNamePrefix string // 文件名前缀
-}
-
-type TmplTableAscPseudoDelete struct {
-	UrlPrefix       string // 路由前缀
-	TableName       string
-	TableNamePascal string
-	TableComment    string
-	FieldLists      []string
-}
-
-func (s *TmplTableAsc) Make() (buffer *bytes.Buffer, err error) {
-	buffer = bytes.NewBuffer(nil)
-	if s.table.app.config.ColumnDeletedAt == "" {
-		return
-	}
-	if s.table.TableFieldSerial != hey.Id {
-		return
-	}
-	fields := strings.Split(s.table.app.config.ColumnDeletedAt, ",")
-	splits := make([]string, 0, len(fields))
-	for _, v := range fields {
-		v = strings.TrimSpace(v)
-		if v == "" {
-			continue
-		}
-		for _, c := range s.table.Column {
-			if c.ColumnName == nil || *c.ColumnName != v {
-				continue
-			}
-			// splits = append(splits, v)
-			// continue
-			t := c.databaseTypeToGoType()
-			t = strings.ReplaceAll(t, "*", "")
-			t = strings.TrimSpace(t)
-			switch t {
-			case "int", "int64":
-				splits = append(splits, v)
-			}
-		}
-	}
-	if len(splits) == 0 {
-		return
-	}
-	value := &TmplTableAscPseudoDelete{
-		UrlPrefix:       s.UrlPrefix,
-		TableName:       s.OriginName,
-		TableNamePascal: s.OriginNamePascal,
-		TableComment:    s.Comment,
-		FieldLists:      splits,
-	}
-	s.PseudoDelete = `r.DELETE("", s.Delete)`
-	temp := NewTemplate("asc_schema_content_custom", tmplAscSchemaContentCustom)
-	if err = temp.Execute(buffer, value); err != nil {
-		return
-	}
-	return
-}
-
-func (s *App) Asc() error {
-	// asc.go
-	if err := s.MakeTmplWire("asc", ""); err != nil {
-		return err
-	}
-	tmpAscSchemaContent := NewTemplate("asc_schema_content", tmplAscSchemaContent)
-	tables := s.AllTable(false)
-	for _, table := range tables {
-		tmp := table.TmplTableAsc()
-		// tmp.UrlPrefix = s.AdminUrlPrefix
-		tmp.UrlPrefix = "/api/v1/admin"
-
-		schemaContentBuffer := bytes.NewBuffer(nil)
-		customMethodBuffer, err := tmp.Make()
-		if err != nil {
-			return err
-		}
-
-		// 自定义方法列表(伪删除)
-		tmp.CustomMethod = customMethodBuffer.String()
-		if err = tmpAscSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
-			return err
-		}
-
-		// PREFIX_table_name_SUFFIX.go
-		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
-		if _, err = os.Stat(schemaContentFilename); err == nil {
-			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
-		}
-		if err = s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
-			return err
-		}
-
-		// PREFIX_table_name_SUFFIX.go 自定义业务代码
-		tmpAscSchemaContentBusinessGo := NewTemplate("asc_schema_content_aab", tempAscSchemaCustomAab)
-		tmpAscSchemaContentBusinessGoBuffer := bytes.NewBuffer(nil)
-		if err = tmpAscSchemaContentBusinessGo.Execute(tmpAscSchemaContentBusinessGoBuffer, tmp); err != nil {
-			return err
-		}
-		schemaCustomAabFilename := pathJoin(s.config.TemplateOutputDirectory, "asc", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix1, tableFilenameGo))
-		if _, err = os.Stat(schemaCustomAabFilename); err == nil {
-			schemaCustomAabFilename = tableFilenameGoTmp(schemaCustomAabFilename)
-		}
-		if err = s.WriteFile(tmpAscSchemaContentBusinessGoBuffer, schemaCustomAabFilename); err != nil {
+		if err := s.WriteFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
 			return err
 		}
 	}
 
-	return nil
-}
-
-type TmplTableCanSchema struct {
-	Version string // 模板版本
-
-	PrefixPackage string // 包导入前缀
-
-	// can
-	AutoRegisterRouterParams     string // can_schema.go tables params
-	AutoRegisterRouterParamsCopy string // can_schema.go tables params with this package name
-	AutoRegisterRouterSlice      string // can_schema.go tables slice
-}
-
-type TmplTableCan struct {
-	table *SysTable
-
-	Version string // 模板版本
-
-	OriginName           string // 原始表名称
-	OriginNamePascal     string // 原始表名称(帕斯卡命名)
-	OriginNameWithPrefix string // 原始表名称
-	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
-	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	PrefixPackage string // 包导入前缀
-
-	UrlPrefix string // 路由前缀
-
-	FileNamePrefix string // 文件名前缀
-}
-
-func (s *App) Can() error {
-	// can.go
-	if err := s.MakeTmplWire("can", ""); err != nil {
-		return err
-	}
-	// can_schema.go
-	tmpCanSchema := NewTemplate("can_schema", tmplCanSchema)
-	tmpCanSchemaContent := NewTemplate("can_schema_content", tmplCanSchemaContent)
-	schema := &TmplTableCanSchema{
-		Version:       s.Version,
-		PrefixPackage: s.config.ImportPrefixPackageName,
-	}
-	tables := s.AllTable(false)
-	for _, table := range tables {
-		tmp := table.TmplTableCan()
-		// tmp.UrlPrefix = s.IndexUrlPrefix
-		tmp.UrlPrefix = "/api/v1/index"
-
-		schemaContentBuffer := bytes.NewBuffer(nil)
-
-		if err := tmpCanSchemaContent.Execute(schemaContentBuffer, tmp); err != nil {
+	// model_schema_custom.go
+	{
+		if err := tmpModelSchemaCustom.Execute(modelSchemaCustomBuffer, s); err != nil {
 			return err
 		}
 
-		// PREFIX_table_name_SUFFIX.go
-		schemaContentFilename := pathJoin(s.config.TemplateOutputDirectory, "can", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
-		if _, err := os.Stat(schemaContentFilename); err == nil {
-			schemaContentFilename = tableFilenameGoTmp(schemaContentFilename)
-		}
-		if err := s.WriteFile(schemaContentBuffer, schemaContentFilename); err != nil {
+		// if _, err := os.Stat(modelSchemaCustomFilename); err != nil {
+		if err := s.WriteFile(modelSchemaCustomBuffer, modelSchemaCustomFilename); err != nil {
 			return err
 		}
+		// }
 	}
-	filename := pathJoin(s.config.TemplateOutputDirectory, "can", "can_schema.go")
-	buffer := bytes.NewBuffer(nil)
-	length := len(tables)
-	params := make([]string, 0, length)
-	paramsCopy := make([]string, 0, length)
-	slice := make([]string, 0, length)
-	for _, table := range tables {
-		namePascal := table.pascal()
-		namePascalSmall := table.pascalSmall()
-		params = append(params, fmt.Sprintf("%s *%s,", namePascalSmall, namePascal))
-		paramsCopy = append(paramsCopy, fmt.Sprintf("// %s *can.%s,", namePascalSmall, namePascal))
-		slice = append(slice, fmt.Sprintf("%s,", namePascalSmall))
-	}
-	schema.AutoRegisterRouterParams = strings.Join(params, "\n\t")
-	schema.AutoRegisterRouterParamsCopy = strings.Join(paramsCopy, "\n")
-	schema.AutoRegisterRouterSlice = strings.Join(slice, "\n\t\t")
-	if err := tmpCanSchema.Execute(buffer, schema); err != nil {
-		return err
-	}
-	if err := s.WriteFile(buffer, filename); err != nil {
-		return err
+
+	// table_create.sql
+	{
+		if err := s.WriteFile(modelTableCreateBuffer, modelTableCreateFilename); err != nil {
+			return err
+		}
 	}
 
 	return nil
