@@ -191,7 +191,10 @@ func (s *{{{.OriginNamePascal}}}) Exists(fc func(get *hey.Get, f hey.Filter), wa
 
 // Insert Quickly insert data.
 func (s *{{{.OriginNamePascal}}}) Insert(insert interface{}, way ...*hey.Way) (int64, error) {
-	return s.SelfInsert(func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema) { model.TableInsert(s, add, insert) }, way...)
+	return s.SelfInsert(func(add *hey.Add, t *model.{{{.OriginNamePascal}}}Schema) {
+    		except := s.T.ColumnAutoIncr()
+    		add.Except(except...).Permit(s.Column(except...)...).Create(insert)
+    	}, way...)
 }
 
 // Delete Quickly delete data.

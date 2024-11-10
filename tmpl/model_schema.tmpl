@@ -91,23 +91,3 @@ type Table interface {
 	// UpdateMust Update at least one row of data from the table.
 	UpdateMust(filter hey.Filter, update map[string]interface{}, way ...*hey.Way) error
 }
-
-// TableInsert Set the insert data of the specified table.
-func TableInsert(table Table, add *hey.Add, insert interface{}) {
-	if mp, ok := insert.(map[string]interface{}); ok {
-		for k, v := range mp {
-			if table.ColumnExist(k) {
-				add.FieldValue(k, v)
-			}
-		}
-		return
-	}
-	fields, values := hey.StructInsert(insert, add.Way().Tag(), table.AddExcept(), nil)
-	if index := table.NotExistsIndex(fields); len(index) > 0 {
-		fields = hey.RemoveSliceMemberByIndex(index, fields)
-		for k, v := range values {
-			values[k] = hey.RemoveSliceMemberByIndex(index, v)
-		}
-	}
-	add.FieldsValues(fields, values)
-}
