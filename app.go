@@ -191,6 +191,14 @@ func pascal(name string) string {
 	return string(tmp[:])
 }
 
+func pascalSmall(name string) string {
+	if len(name) == 0 {
+		return ""
+	}
+	name = pascal(name)
+	return strings.ToLower(name[0:1]) + name[1:]
+}
+
 func upper(str string) string {
 	return strings.ToUpper(str)
 }

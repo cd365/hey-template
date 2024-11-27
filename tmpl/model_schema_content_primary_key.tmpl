@@ -1,0 +1,138 @@
+
+// PrimaryKeyUpdate Update based on the primary key as a condition. update can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyUpdate(update PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+    if update == nil {
+        return 0, nil
+    }
+	return s.Update(func(f hey.Filter, u *hey.Mod) {
+        f.Equal(s.{{{.PrimaryKeyUpper}}}, update.PrimaryKey()).Use(filter, s.Available())
+        u.Modify(update)
+    }, ways...)
+}
+
+// PrimaryKeyHidden Hidden based on the primary key as a condition. hidden can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyHidden(hidden PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+    if hidden == nil {
+        return 0, nil
+    }
+	updates := make(map[string]interface{}, 8)
+	way := s.W(ways...)
+	now := way.Now()
+	for _, tmp := range s.ColumnDeletedAt() {
+		updates[tmp] = now.Unix()
+	}
+	if len(updates) == 0 {
+		return 0, nil
+	}
+	return s.Update(func(f hey.Filter, u *hey.Mod) {
+        f.Equal(s.{{{.PrimaryKeyUpper}}}, hidden.PrimaryKey()).Use(filter, s.Available())
+        u.Modify(updates)
+    }, ways...)
+}
+
+// PrimaryKeyDelete Delete based on the primary key as a condition. remove can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyDelete(remove PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+    if remove == nil {
+        return 0, nil
+    }
+	return s.Delete(s.F(func(f hey.Filter, t *TableSchema{{{.OriginNamePascal}}}) {
+        f.Equal(t.{{{.PrimaryKeyUpper}}}, remove.PrimaryKey()).Use(filter, s.Available())
+    }), ways...)
+}
+
+// PrimaryKeySaving Saving based on the primary key as a condition. saving can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeySaving(saving PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	if saving == nil {
+		return 0, nil
+	}
+	pk := saving.PrimaryKey()
+	if pk == nil {
+		return s.Add(ways...).Default(func(o *hey.Add) {
+            timestamp := o.Way().Now().Unix()
+            for _, v := range s.ColumnCreatedAt() {
+                o.FieldValue(v, timestamp)
+            }
+        }).Create(saving).ReturningId()
+	}
+	return s.PrimaryKeyUpdate(saving, filter, ways...)
+}
+
+// PrimaryKeyUpdateAll Batch update based on primary key value.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(ctx context.Context, updateLists []PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	way := s.W(ways...)
+	var total int64
+	err := way.TransactionContext(ctx, 1, func(tx *hey.Way) error {
+		for _, tmp := range updateLists {
+			if num, err := s.PrimaryKeyUpdate(tmp, filter, tx); err != nil {
+				return err
+			} else {
+				total += num
+			}
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// PrimaryKeyHiddenAll Batch hidden based on primary key value.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(ctx context.Context, hiddenLists []PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	way := s.W(ways...)
+	var total int64
+	err := way.TransactionContext(ctx, 1, func(tx *hey.Way) error {
+		for _, tmp := range hiddenLists {
+			if num, err := s.PrimaryKeyHidden(tmp, filter, tx); err != nil {
+				return err
+			} else {
+				total += num
+			}
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// PrimaryKeyDeleteAll Batch delete based on primary key value.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(ctx context.Context, deleteLists []PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	way := s.W(ways...)
+	var total int64
+	err := way.TransactionContext(ctx, 1, func(tx *hey.Way) error {
+		for _, tmp := range deleteLists {
+			if num, err := s.PrimaryKeyDelete(tmp, filter, tx); err != nil {
+				return err
+			} else {
+				total += num
+			}
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// PrimaryKeySavingAll Batch saving based on primary key value.
+func (s *TableSchema{{{.OriginNamePascal}}}) PrimaryKeySavingAll(ctx context.Context, savingLists []PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	way := s.W(ways...)
+	var total int64
+	err := way.TransactionContext(ctx, 1, func(tx *hey.Way) error {
+		for _, tmp := range savingLists {
+			if num, err := s.PrimaryKeySaving(tmp, filter, tx); err != nil {
+				return err
+			} else {
+				total += num
+			}
+		}
+		return nil
+	}, nil)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
+}

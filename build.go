@@ -3,9 +3,8 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"strings"
-
 	"github.com/cd365/hey/v2"
+	"strings"
 )
 
 type TmplWire struct {
@@ -55,6 +54,13 @@ func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string)
 	return nil
 }
 
+type TableColumnPrimaryKey struct {
+	OriginNamePascal      string
+	PrimaryKeyPascal      string
+	PrimaryKeySmallPascal string
+	PrimaryKeyUpper       string
+}
+
 type TmplTableModel struct {
 	table *SysTable
 
@@ -71,8 +77,10 @@ type TmplTableModel struct {
 	StructColumnSchema                []string // 表结构体字段关系定义 ==> Name string // name 名称
 	StructColumnSchemaFieldSlice      string   // NewHey.Field ==> // []string{"id", "name"}
 	StructColumnSchemaFieldSliceValue string   // NewHey.FieldStr ==> // `"id", "name"` || "`id`, `name`"
+	StructColumnPrimaryKey            string   // 表结构体字段定义 ==> 主键字段结构体定义
 	StructColumnMod                   []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
 	StructColumnAdd                   []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
+	StructColumnAddPrimaryKey         string   // 表结构体字段定义 ==> 添加结构体设置 PrimaryKey 方法
 
 	StructColumnSchemaValues          []string // NewHey.Attribute ==> Name:"name", // 名称
 	StructColumnSchemaValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
@@ -82,6 +90,8 @@ type TmplTableModel struct {
 	ColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
 	ColumnUpdatedAt string // 结构体字段方法 ColumnUpdatedAt
 	ColumnDeletedAt string // 结构体字段方法 ColumnDeletedAt
+
+	PrimaryKey string // 主键自定义方法
 }
 
 func (s *TmplTableModel) Make() {
@@ -241,11 +251,12 @@ func (s *TmplTableModel) Make() {
 	// add
 	write := false
 	for _, c := range s.table.Column {
+		if s.table.TableFieldSerial == *c.ColumnName {
+			s.StructColumnAddPrimaryKey = fmt.Sprintf("func (s %sInsert) PrimaryKey() interface{} {\n\treturn nil\n}", s.table.pascal())
+			continue
+		}
 		if _, ok := ignoreMap[*c.ColumnName]; ok {
 			continue // ignore columns like id, created_at, updated_at, deleted_at
-		}
-		if s.table.TableFieldSerial == *c.ColumnName {
-			continue
 		}
 		opts := ""
 		if c.CharacterMaximumLength != nil && *c.CharacterOctetLength > 0 {
@@ -290,11 +301,27 @@ func (s *TmplTableModel) Make() {
 			opts,
 		)
 		if *c.ColumnName == s.table.TableFieldSerial {
-			tmp = fmt.Sprintf("\t%s %s `json:\"%s\" db:\"-\" validate:\"omitempty\"`",
-				c.pascal(),
+			// TableSerial
+			// TableSerial.SERIAL
+			comment := c.comment()
+			if comment != "" {
+				comment = fmt.Sprintf(" // %s", comment)
+			}
+			tablePascal := s.table.pascal()
+			columnPascal := c.pascal()
+			s.StructColumnPrimaryKey = fmt.Sprintf("type %sPrimaryKey struct {\n\t%s *%s `json:\"%s\" db:\"-\" validate:\"omitempty,min=1\"`%s\n}\n\nfunc (s %sPrimaryKey) PrimaryKey() interface{} {\n\t if s.%s != nil {\n\treturn *s.%s\n\t}\n\treturn nil\n}",
+				tablePascal,
+				columnPascal,
 				c.databaseTypeToGoType(),
 				underline(*c.ColumnName),
+				comment,
+				tablePascal,
+				columnPascal,
+				columnPascal,
 			)
+			// append Primary-Key define
+			s.StructColumnMod = append(s.StructColumnMod, fmt.Sprintf("\t%sPrimaryKey\n", tablePascal))
+			continue
 		}
 
 		comment := c.comment()
@@ -307,6 +334,26 @@ func (s *TmplTableModel) Make() {
 			write = true
 		}
 		s.StructColumnMod = append(s.StructColumnMod, tmp)
+	}
+
+	// primary key
+	if s.table.TableFieldSerial != "" {
+		tmpl := NewTemplate(
+			fmt.Sprintf("tmpl_model_schema_content_primary_key_%s_%s", *s.table.TableName, s.table.TableFieldSerial),
+			tmplModelSchemaContentPrimaryKey,
+		)
+		buffer := bytes.NewBuffer(nil)
+		data := &TableColumnPrimaryKey{
+			OriginNamePascal:      s.table.pascal(),
+			PrimaryKeyPascal:      pascal(s.table.TableFieldSerial),
+			PrimaryKeySmallPascal: pascalSmall(s.table.TableFieldSerial),
+			PrimaryKeyUpper:       strings.ToUpper(s.table.TableFieldSerial),
+		}
+		if err := tmpl.Execute(buffer, data); err != nil {
+			return
+		} else {
+			s.PrimaryKey = buffer.String()
+		}
 	}
 
 }
@@ -397,7 +444,7 @@ func (s *App) Model() error {
 		for _, table := range tables {
 			namePascal := table.pascal()
 			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaName, namePascal))
-			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(),", namePascal, schemaName, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(way),", namePascal, schemaName, namePascal))
 			storage = append(storage, fmt.Sprintf("tmp.%s.Table(): tmp.%s,", namePascal, namePascal))
 			slice = append(slice, fmt.Sprintf("tmp.%s.Table(),", namePascal))
 		}

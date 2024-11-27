@@ -17,6 +17,9 @@ var (
 	//go:embed tmpl/model_schema_content.tmpl
 	tmplModelSchemaContent []byte
 
+	//go:embed tmpl/model_schema_content_primary_key.tmpl
+	tmplModelSchemaContentPrimaryKey []byte
+
 	//go:embed pgsql/func_create.sql
 	pgsqlFuncCreate string
 

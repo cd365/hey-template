@@ -4,25 +4,17 @@
 package model
 
 import (
-    "database/sql"
 	"github.com/cd365/hey/v2"
 )
 
-var (
-    Way *hey.Way // data operation object, don't forget to assign it.
-)
-
 // AutoSelectWay Get the last non-empty element.
-func AutoSelectWay(ways ...*hey.Way) *hey.Way {
+func AutoSelectWay(way *hey.Way, ways ...*hey.Way) *hey.Way {
 	for i := len(ways) - 1; i >= 0; i-- {
 		if ways[i] != nil {
 			return ways[i]
 		}
 	}
-	if Way != nil {
-        return Way
-    }
-    panic("model.Way is nil")
+	return way
 }
 
 // MapValues Get all the values of the map.
@@ -54,25 +46,6 @@ func ColumnValueIn[T any](column string, value func(tmp T) interface{}, slice []
 	return filter.In(column, inValues...)
 }
 
-// RowsExists Check whether the data exists according to the conditions.
-func RowsExists(table string, column string, where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (exists bool, err error) {
-	get := AutoSelectWay(ways...).Get(table).Column(column).Where(where)
-	if custom != nil {
-		custom(get)
-	}
-	get.Limit(1)
-	err = get.ScanAll(func(rows *sql.Rows) error {
-		exists = rows.Next()
-		return nil
-	})
-	return
-}
-
-// RowsCount Total number of statistics according to the conditions.
-func RowsCount(table string, where hey.Filter, column ...string) (count int64, err error) {
-	return AutoSelectWay().Get(table).Where(where).Count(column...)
-}
-
 type Table interface {
     Table() string
 	Comment() string
@@ -87,9 +60,11 @@ type Table interface {
     Del(ways ...*hey.Way) *hey.Del
     Mod(ways ...*hey.Way) *hey.Mod
     Get(ways ...*hey.Way) *hey.Get
+    Available() hey.Filter
 	Insert(create interface{}, ways ...*hey.Way) (int64, error)
     Delete(where hey.Filter, ways ...*hey.Way) (int64, error)
-    Update(where hey.Filter, modify interface{}, ways ...*hey.Way) (int64, error)
+    Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error)
+    InsertOne(create interface{}, ways ...*hey.Way) (int64, error)
     SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error)
 }
 
@@ -99,7 +74,7 @@ type AllTable struct {
 	{{{.MapListDefine}}}
 }
 
-func NewAllTable() *AllTable {
+func NewAllTable(way *hey.Way) *AllTable {
 	tmp := &AllTable{
 		{{{.MapListAssign}}}
 	}
@@ -131,4 +106,8 @@ func (s *AllTable) TableSlice() []string {
 func (s *AllTable) TableExists(table string) bool {
 	_, ok := s.schemaMap[table]
 	return ok
+}
+
+type PrimaryKey interface {
+	PrimaryKey() interface{}
 }
