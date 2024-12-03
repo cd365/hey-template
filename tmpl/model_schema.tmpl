@@ -108,6 +108,24 @@ func (s *AllTable) TableExists(table string) bool {
 	return ok
 }
 
+// PrimaryKey Used to obtain the primary key column value of the database table.
 type PrimaryKey interface {
 	PrimaryKey() interface{}
+}
+
+// FetchPrimaryKey Get all primary key values.
+func FetchPrimaryKey(pks ...PrimaryKey) []interface{} {
+	length := len(pks)
+	result := make([]interface{}, 0, length)
+	for i := 0; i < length; i++ {
+		if pks[i] == nil {
+			continue
+		}
+		value := pks[i].PrimaryKey()
+		if value == nil {
+			continue
+		}
+		result = append(result, value)
+	}
+	return result
 }

@@ -14,22 +14,22 @@ type {{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumn}}}{{{$v}}}{{{end}}}
 }
 
-type TableSchema{{{.OriginNamePascal}}} struct {
+type SCHEMA{{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
     columnMap map[string]*struct{}
     columnSlice []string
     way *hey.Way
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Table() string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Table() string {
 	return "{{{.OriginNameWithPrefix}}}"
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Comment() string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Comment() string {
 	return "{{{.Comment}}}"
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Column(except ...string) []string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Column(except ...string) []string {
 	excepted := make(map[string]*struct{})
     for _, v := range except {
         excepted[v] = &struct{}{}
@@ -44,7 +44,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Column(except ...string) []string {
     return result
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnMap() map[string]*struct{} {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnMap() map[string]*struct{} {
 	result := make(map[string]*struct{}, len(s.columnMap))
 	for k, v := range s.columnMap {
 		result[k] = v
@@ -52,32 +52,32 @@ func (s *TableSchema{{{.OriginNamePascal}}}) ColumnMap() map[string]*struct{} {
 	return result
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnString() string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnString() string {
 	return {{{.StructColumnSchemaFieldSliceValue}}}
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnExist(column string) bool {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnExist(column string) bool {
 	_, exist := s.columnMap[column]
 	return exist
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnAutoIncr() []string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnAutoIncr() []string {
 	return {{{.ColumnAutoIncr}}}
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnCreatedAt() []string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnCreatedAt() []string {
 	return {{{.ColumnCreatedAt}}}
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnUpdatedAt() []string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnUpdatedAt() []string {
 	return {{{.ColumnUpdatedAt}}}
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) ColumnDeletedAt() []string {
+func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnDeletedAt() []string {
 	return {{{.ColumnDeletedAt}}}
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) F(filters ...func(f hey.Filter, t *TableSchema{{{.OriginNamePascal}}})) hey.Filter {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Filter(filters ...func(f hey.Filter, t *SCHEMA{{{.OriginNamePascal}}})) hey.Filter {
 	filter := s.way.F()
 	for _, tmp := range filters {
 		if tmp != nil {
@@ -87,31 +87,31 @@ func (s *TableSchema{{{.OriginNamePascal}}}) F(filters ...func(f hey.Filter, t *
 	return filter
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Add(ways ...*hey.Way) *hey.Add {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Add(ways ...*hey.Way) *hey.Add {
 	except := s.ColumnAutoIncr()
 	return AutoSelectWay(s.way, ways...).Add(s.Table()).Except(except...).Permit(s.Column(except...)...)
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Del(ways ...*hey.Way) *hey.Del {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Del(ways ...*hey.Way) *hey.Del {
 	return AutoSelectWay(s.way, ways...).Del(s.Table())
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Mod(ways ...*hey.Way) *hey.Mod {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Mod(ways ...*hey.Way) *hey.Mod {
 	except := s.ColumnAutoIncr()
 	except = append(except, s.ColumnCreatedAt()...)
 	return AutoSelectWay(s.way, ways...).Mod(s.Table()).Except(except...).Permit(s.Column(except...)...)
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Get(ways ...*hey.Way) *hey.Get {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Get(ways ...*hey.Way) *hey.Get {
 	return AutoSelectWay(s.way, ways...).Get(s.Table()).Column(s.Column()...)
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) W(ways ...*hey.Way) *hey.Way {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Way(ways ...*hey.Way) *hey.Way {
 	return AutoSelectWay(s.way, ways...)
 }
 
-func (s *TableSchema{{{.OriginNamePascal}}}) Available() hey.Filter {
-	return s.F(func(f hey.Filter, t *TableSchema{{{.OriginNamePascal}}}) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Available() hey.Filter {
+	return s.Filter(func(f hey.Filter, t *SCHEMA{{{.OriginNamePascal}}}) {
 		for _, v := range s.ColumnDeletedAt() {
 			f.Equal(v, 0)
 		}
@@ -119,7 +119,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Available() hey.Filter {
 }
 
 // Insert SQL INSERT.
-func (s *TableSchema{{{.OriginNamePascal}}}) Insert(create interface{}, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Insert(create interface{}, ways ...*hey.Way) (int64, error) {
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
 	defer cancel()
 	return s.Add(ways...).
@@ -135,7 +135,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Insert(create interface{}, ways ...
 }
 
 // Delete SQL DELETE.
-func (s *TableSchema{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*hey.Way) (int64, error) {
 	if where.IsEmpty() {
 		return 0, nil
 	}
@@ -148,7 +148,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*h
 }
 
 // Update SQL UPDATE.
-func (s *TableSchema{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error) {
 	modify := s.Mod(ways...).
 		Default(func(o *hey.Mod) {
 			timestamp := o.Way().Now().Unix()
@@ -156,7 +156,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u 
 				o.Set(v, timestamp)
 			}
 		})
-	filter := s.F()
+	filter := s.Filter()
 	if update != nil {
 		update(filter, modify)
 	}
@@ -169,7 +169,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u 
 }
 
 // InsertOne Insert a record and return the auto-increment id.
-func (s *TableSchema{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways ...*hey.Way) (int64, error) {
 	return s.Add(ways...).Default(func(o *hey.Add) {
 		timestamp := o.Way().Now().Unix()
 		for _, v := range s.ColumnCreatedAt() {
@@ -179,19 +179,19 @@ func (s *TableSchema{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways 
 }
 
 // InsertSelect SQL INSERT SELECT.
-func (s *TableSchema{{{.OriginNamePascal}}}) InsertSelect(column []string, get *hey.Get, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) InsertSelect(column []string, get *hey.Get, ways ...*hey.Way) (int64, error) {
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
 	defer cancel()
 	return s.Add(ways...).Context(ctx).ValuesSubQueryGet(get, column...).Add()
 }
 
 // SelectCount SQL SELECT COUNT.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error) {
 	return s.Get(ways...).Where(where).Count()
 }
 
 // SelectQuery SQL SELECT.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), query func(rows *sql.Rows) error, ways ...*hey.Way) error {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), query func(rows *sql.Rows) error, ways ...*hey.Way) error {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
 		custom(get, s)
@@ -200,12 +200,12 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custo
 }
 
 // EmptySlice Initialize an empty slice.
-func (s *TableSchema{{{.OriginNamePascal}}}) EmptySlice() []*{{{.OriginNamePascal}}} {
+func (s *SCHEMA{{{.OriginNamePascal}}}) EmptySlice() []*{{{.OriginNamePascal}}} {
 	return make([]*{{{.OriginNamePascal}}}, 0, 32)
 }
 
 // SelectGet SQL SELECT.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) error {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) error {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
 		custom(get, s)
@@ -214,7 +214,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom 
 }
 
 // SelectAll SQL SELECT ALL.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
 		custom(get, s)
@@ -228,8 +228,8 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom 
 }
 
 // SelectOne SQL SELECT ONE.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
-	all, err := s.SelectAll(where, func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
 		if custom != nil {
 			custom(get, t)
 		}
@@ -245,8 +245,8 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom 
 }
 
 // SelectExists SQL SELECT EXISTS.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (bool, error) {
-	exists, err := s.SelectOne(where, func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (bool, error) {
+	exists, err := s.SelectOne(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
 		if custom != nil {
 			custom(get, t)
 		}
@@ -259,7 +259,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, cust
 }
 
 // SelectCountAll SQL SELECT COUNT + ALL.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (int64, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (int64, []*{{{.OriginNamePascal}}}, error) {
 	total, err := s.SelectCount(where, ways...)
 	if err != nil {
 		return 0, nil, err
@@ -275,7 +275,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, cu
 }
 
 // SelectCountGet SQL SELECT COUNT + GET.
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) (int64, error) {
 	count, err := s.SelectCount(where, ways...)
 	if err != nil {
 		return 0, err
@@ -290,7 +290,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, cu
 }
 
 // SelectAllMap Make map[string]*{{{.OriginNamePascal}}}
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) string, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[string]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) string, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[string]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -303,7 +303,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, make
 }
 
 // SelectAllMapInt Make map[int]*{{{.OriginNamePascal}}}
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -316,7 +316,7 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, m
 }
 
 // SelectAllMapInt64 Make map[int64]*{{{.OriginNamePascal}}}
-func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int64, custom func(get *hey.Get, t *TableSchema{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int64]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int64, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int64]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -328,8 +328,8 @@ func (s *TableSchema{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter,
 	return allMap, all, nil
 }
 
-func NewTableSchema{{{.OriginNamePascal}}}(way *hey.Way) *TableSchema{{{.OriginNamePascal}}} {
-	s := &TableSchema{{{.OriginNamePascal}}}{
+func NewSCHEMA{{{.OriginNamePascal}}}(way *hey.Way) *SCHEMA{{{.OriginNamePascal}}} {
+	s := &SCHEMA{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
 	}
 	s.columnMap = {{{.StructColumnSchemaValuesAccessMap}}}
@@ -338,7 +338,7 @@ func NewTableSchema{{{.OriginNamePascal}}}(way *hey.Way) *TableSchema{{{.OriginN
 	return s
 }
 
-type {{{.OriginNamePascal}}}Insert struct {
+type INSERT{{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumnAdd}}}{{{$v}}}{{{end}}}
 }
 
@@ -346,7 +346,7 @@ type {{{.OriginNamePascal}}}Insert struct {
 
 {{{ .StructColumnPrimaryKey }}}
 
-type {{{.OriginNamePascal}}}Update struct {
+type UPDATE{{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumnMod}}}{{{$v}}}{{{end}}}
 }
 

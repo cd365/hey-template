@@ -252,7 +252,7 @@ func (s *TmplTableModel) Make() {
 	write := false
 	for _, c := range s.table.Column {
 		if s.table.TableFieldSerial == *c.ColumnName {
-			s.StructColumnAddPrimaryKey = fmt.Sprintf("func (s %sInsert) PrimaryKey() interface{} {\n\treturn nil\n}", s.table.pascal())
+			s.StructColumnAddPrimaryKey = fmt.Sprintf("func (s INSERT%s) PrimaryKey() interface{} {\n\treturn nil\n}", s.table.pascal())
 			continue
 		}
 		if _, ok := ignoreMap[*c.ColumnName]; ok {
@@ -309,7 +309,7 @@ func (s *TmplTableModel) Make() {
 			}
 			tablePascal := s.table.pascal()
 			columnPascal := c.pascal()
-			s.StructColumnPrimaryKey = fmt.Sprintf("type %sPrimaryKey struct {\n\t%s *%s `json:\"%s\" db:\"-\" validate:\"omitempty,min=1\"`%s\n}\n\nfunc (s %sPrimaryKey) PrimaryKey() interface{} {\n\t if s.%s != nil {\n\treturn *s.%s\n\t}\n\treturn nil\n}",
+			s.StructColumnPrimaryKey = fmt.Sprintf("type PRIMARYKEY%s struct {\n\t%s *%s `json:\"%s\" db:\"-\" validate:\"omitempty,min=1\"`%s\n}\n\nfunc (s PRIMARYKEY%s) PrimaryKey() interface{} {\n\t if s.%s != nil {\n\treturn *s.%s\n\t}\n\treturn nil\n}",
 				tablePascal,
 				columnPascal,
 				c.databaseTypeToGoType(),
@@ -320,7 +320,7 @@ func (s *TmplTableModel) Make() {
 				columnPascal,
 			)
 			// append Primary-Key define
-			s.StructColumnMod = append(s.StructColumnMod, fmt.Sprintf("\t%sPrimaryKey\n", tablePascal))
+			s.StructColumnMod = append(s.StructColumnMod, fmt.Sprintf("\tPRIMARYKEY%s\n", tablePascal))
 			continue
 		}
 
@@ -440,7 +440,7 @@ func (s *App) Model() error {
 		assigns := make([]string, 0, length)
 		storage := make([]string, 0, length)
 		slice := make([]string, 0, length)
-		schemaName := "TableSchema"
+		schemaName := "SCHEMA"
 		for _, table := range tables {
 			namePascal := table.pascal()
 			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaName, namePascal))
