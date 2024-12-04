@@ -52,8 +52,8 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey PrimaryKey, 
     }), ways...)
 }
 
-// PrimaryKeySaving Saving based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySaving(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+// PrimaryKeyUpsert Upsert based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if primaryKey == nil {
 		return 0, nil
 	}
@@ -126,8 +126,8 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(ctx context.Context,
 	return total, nil
 }
 
-// PrimaryKeySavingAll Batch saving based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySavingAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
+// PrimaryKeyUpsertAll Batch upsert based on primary key value.
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	var err error
     var num int64
@@ -179,7 +179,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateMap(primaryKey interface
 	}, ways...)
 }
 
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySavingMap(primaryKey interface{}, upsert map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface{}, upsert map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if len(upsert) == 0 {
 		return 0, nil
 	}
