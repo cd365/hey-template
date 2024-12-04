@@ -403,7 +403,13 @@ func (s *App) Model() error {
 					return err
 				}
 			}
+			// comment
 			if _, err := modelTableCreateBuffer.WriteString(fmt.Sprintf("/* %s (%s) */\n", *table.TableName, *table.TableComment)); err != nil {
+				return err
+			}
+			// add drop table sql
+			dropTableName := fmt.Sprintf("%s%s%s", s.cfg.DatabaseIdentify, *table.TableName, s.cfg.DatabaseIdentify)
+			if _, err := modelTableCreateBuffer.WriteString(fmt.Sprintf("DROP TABLE IF EXISTS %s;\n", dropTableName)); err != nil {
 				return err
 			}
 			if _, err := modelTableCreateBuffer.WriteString(ddl); err != nil {
