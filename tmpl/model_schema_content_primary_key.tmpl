@@ -9,7 +9,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey PrimaryKey, 
         return 0, nil
     }
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter, s.Available())
+        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
         u.Modify(primaryKey)
     }, ways...)
 }
@@ -33,7 +33,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey PrimaryKey, 
 		return 0, nil
 	}
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter, s.Available())
+        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
         u.Modify(updates)
     }, ways...)
 }
@@ -48,7 +48,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey PrimaryKey, 
         return 0, nil
     }
 	return s.Delete(s.Filter(func(f hey.Filter, t *SCHEMA{{{.OriginNamePascal}}}) {
-        f.Equal(t.{{{.PrimaryKeyUpper}}}, pk).Use(filter, s.Available())
+        f.Equal(t.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
     }), ways...)
 }
 
@@ -177,7 +177,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateMap(primaryKey interface
 		return 0, nil
 	}
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-		f.Use(s.PrimaryKeyEqual(primaryKey), filter, s.Available())
+		f.Use(s.PrimaryKeyEqual(primaryKey), filter)
 		u.Modify(modify)
 	}, ways...)
 }
@@ -190,8 +190,8 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface
 	if primaryKey == nil {
 		return s.Insert(upsert, ways...)
 	}
-	where := s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available())
-	exists, err := s.SelectExists(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) { get.Column(t.{{{.PrimaryKeyUpper}}}) }, ways...)
+	where := s.PrimaryKeyEqual(primaryKey)
+	exists, err := s.SelectExists(s.Filter().Use(where, filter, s.Available()), func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) { get.Column(t.{{{.PrimaryKeyUpper}}}) }, ways...)
 	if err != nil {
 		return 0, err
 	}
@@ -199,9 +199,14 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface
 		return s.Insert(upsert, ways...)
 	}
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-		f.Use(where)
+		f.Use(where, filter)
 		u.Modify(upsert)
 	}, ways...)
+}
+
+// PrimaryKeyDeleteFilter Delete one or more records based on the primary key values. Additional conditions can be added in the filter.
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteFilter(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+	return s.Delete(s.PrimaryKeyIn(primaryKeys).Use(filter), ways...)
 }
 
 // PrimaryKeySelectAll Query multiple records based on primary key values. Additional conditions can be added in the filter.
