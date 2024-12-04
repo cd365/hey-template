@@ -219,7 +219,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(
 	if custom != nil {
 		custom(get, s)
 	}
-	all := make([]*{{{.OriginNamePascal}}}, 0)
+	all := s.EmptySlice()
 	err := get.Get(&all)
 	if err != nil {
 		return nil, err

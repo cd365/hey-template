@@ -55,10 +55,11 @@ func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string)
 }
 
 type TableColumnPrimaryKey struct {
-	OriginNamePascal      string
-	PrimaryKeyPascal      string
-	PrimaryKeySmallPascal string
-	PrimaryKeyUpper       string
+	OriginNamePascal      string // 表名(帕斯卡命名)
+	PrimaryKeyPascal      string // 主键名(帕斯卡命名)
+	PrimaryKeySmallPascal string // 主键名(驼峰命名)
+	PrimaryKeyUpper       string // 主键名(全大写) 如: ACCOUNT_USERNAME
+	PrimaryKeyType        string // 主键在go语言里面的类型(int | int64 | string), 其它类型无效
 }
 
 type TmplTableModel struct {
@@ -348,6 +349,12 @@ func (s *TmplTableModel) Make() {
 			PrimaryKeyPascal:      pascal(s.table.TableFieldSerial),
 			PrimaryKeySmallPascal: pascalSmall(s.table.TableFieldSerial),
 			PrimaryKeyUpper:       strings.ToUpper(s.table.TableFieldSerial),
+		}
+		for _, c := range s.table.Column {
+			if s.table.TableFieldSerial == *c.ColumnName {
+				data.PrimaryKeyType = strings.ToLower(c.databaseTypeToGoType())
+				break
+			}
 		}
 		if err := tmpl.Execute(buffer, data); err != nil {
 			return
