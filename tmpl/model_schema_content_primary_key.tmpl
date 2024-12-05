@@ -279,22 +279,22 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys inter
     {{{ end }}}
 {{{ end }}}
 
-// PrimaryKeyAll Query multiple records based on primary key values.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyAll(primaryKeys interface{}, query func(get *hey.Get), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
-	return s.PrimaryKeySelectAll(primaryKeys, query, nil, ways...)
+// PrimaryKeyGetAll Query multiple records based on primary key values.
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetAll(primaryKeys interface{}, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectAll(primaryKeys, nil, nil, ways...)
 }
 
-// PrimaryKeyOne Query a piece of data based on the primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyOne(primaryKey interface{}, query func(get *hey.Get), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
-	return s.PrimaryKeySelectOne(primaryKey, query, nil, ways...)
+// PrimaryKeyGetOne Query a piece of data based on the primary key value.
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetOne(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectOne(primaryKey, nil, nil, ways...)
+}
+
+// PrimaryKeyGetAllMap Make map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetAllMap(primaryKeys interface{}, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectAllMap(primaryKeys, nil, nil, ways...)
 }
 
 // PrimaryKeyExists Check whether the data exists based on the primary key value.
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyExists(primaryKey interface{}, ways ...*hey.Way) (bool, error) {
 	return s.PrimaryKeySelectExists(primaryKey, nil, ways...)
-}
-
-// PrimaryKeyAllMap Make map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyAllMap(primaryKeys interface{}, query func(get *hey.Get), ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
-	return s.PrimaryKeySelectAllMap(primaryKeys, query, nil, ways...)
 }
