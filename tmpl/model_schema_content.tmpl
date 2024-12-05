@@ -328,6 +328,61 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, make
 	return allMap, all, nil
 }
 
+// DeleteByColumn Delete by column values. Additional conditions can be added in the filters. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) DeleteByColumn(column string, values interface{}, filters ...hey.Filter) (int64, error) {
+	return s.Delete(s.Filter().In(column, values).Use(filters...))
+}
+
+// UpdateByColumn Update by column values. Additional conditions can be added in the filters. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) UpdateByColumn(column string, values interface{}, modify interface{}, filters ...hey.Filter) (int64, error) {
+	if modify == nil {
+		return 0, nil
+	}
+	return s.Update(func(f hey.Filter, u *hey.Mod) {
+		f.In(column, values).Use(filters...)
+		u.Modify(modify)
+	})
+}
+
+// SelectAllByColumn Select all by column values. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) ([]*{{{.OriginNamePascal}}}, error) {
+	where := s.Filter().In(column, values)
+	return s.SelectAll(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+		for _, custom := range customs {
+			if custom != nil {
+				custom(where, get, t)
+				break
+			}
+		}
+	})
+}
+
+// SelectOneByColumn Select one by column values. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOneByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) (*{{{.OriginNamePascal}}}, error) {
+	where := s.Filter().In(column, values)
+	return s.SelectOne(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+		for _, custom := range customs {
+			if custom != nil {
+				custom(where, get, t)
+				break
+			}
+		}
+	})
+}
+
+// SelectExistsByColumn Select exists by column values. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExistsByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) (bool, error) {
+	where := s.Filter().In(column, values)
+	return s.SelectExists(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+		for _, custom := range customs {
+			if custom != nil {
+				custom(where, get, t)
+				break
+			}
+		}
+	})
+}
+
 func NewSCHEMA{{{.OriginNamePascal}}}(way *hey.Way) *SCHEMA{{{.OriginNamePascal}}} {
 	s := &SCHEMA{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
