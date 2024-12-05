@@ -383,6 +383,19 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExistsByColumn(column string, valu
 	})
 }
 
+// SelectGetByColumn Select get by column values. no transaction support.
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectGetByColumn(column string, values interface{}, receive interface{}, customs ...func(f hey.Filter, g *hey.Get)) error {
+	where := s.Filter().In(column, values)
+	return s.SelectGet(where, func(get *hey.Get) {
+		for _, custom := range customs {
+			if custom != nil {
+				custom(where, get)
+				break
+			}
+		}
+	}, receive)
+}
+
 func NewSCHEMA{{{.OriginNamePascal}}}(way *hey.Way) *SCHEMA{{{.OriginNamePascal}}} {
 	s := &SCHEMA{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
@@ -406,3 +419,37 @@ type UPDATE{{{.OriginNamePascal}}} struct {
 }
 
 {{{.PrimaryKey}}}
+
+// ValueStruct struct value
+func (s *SCHEMA{{{.OriginNamePascal}}}) ValueStruct() interface{} {
+	return {{{.OriginNamePascal}}}{}
+}
+
+// ValueStructPtr struct pointer value
+func (s *SCHEMA{{{.OriginNamePascal}}}) ValueStructPtr() interface{} {
+	return &{{{.OriginNamePascal}}}{}
+}
+
+// ValueSliceStruct slice struct value
+func (s *SCHEMA{{{.OriginNamePascal}}}) ValueSliceStruct(capacities ...int) interface{} {
+    capacity := 8
+    for i := len(capacities) - 1; i >= 0; i++ {
+        if capacities[i] >= 0 {
+            capacity = capacities[i]
+            break
+        }
+    }
+	return make([]{{{.OriginNamePascal}}}, 0, capacity)
+}
+
+// ValueSliceStructPtr slice struct pointer value
+func (s *SCHEMA{{{.OriginNamePascal}}}) ValueSliceStructPtr(capacities ...int) interface{} {
+	capacity := 8
+    for i := len(capacities) - 1; i >= 0; i++ {
+        if capacities[i] >= 0 {
+            capacity = capacities[i]
+            break
+        }
+    }
+    return make([]*{{{.OriginNamePascal}}}, 0, capacity)
+}

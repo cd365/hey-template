@@ -4,6 +4,8 @@
 package model
 
 import (
+    "context"
+    "database/sql"
 	"github.com/cd365/hey/v2"
 )
 
@@ -46,26 +48,66 @@ func ColumnValueIn[T any](column string, value func(tmp T) interface{}, slice []
 	return filter.In(column, inValues...)
 }
 
+// PrimaryKey Used to obtain the primary key column value of the database table.
+type PrimaryKey interface {
+	PrimaryKey() interface{}
+}
+
 type Table interface {
     Table() string
-	Comment() string
-	Column(except ...string) []string
-	ColumnExist(column string) bool
-	ColumnAutoIncr() []string
-	ColumnCreatedAt() []string
-	ColumnUpdatedAt() []string
-	ColumnDeletedAt() []string
+    Comment() string
+    Column(except ...string) []string
+    ColumnMap() map[string]*struct{}
+    ColumnString() string
+    ColumnExist(column string) bool
+    ColumnAutoIncr() []string
+    ColumnCreatedAt() []string
+    ColumnUpdatedAt() []string
+    ColumnDeletedAt() []string
 
+    Filter(filters ...func(f hey.Filter)) hey.Filter
     Add(ways ...*hey.Way) *hey.Add
     Del(ways ...*hey.Way) *hey.Del
     Mod(ways ...*hey.Way) *hey.Mod
     Get(ways ...*hey.Way) *hey.Get
+    Way(ways ...*hey.Way) *hey.Way
     Available() hey.Filter
-	Insert(create interface{}, ways ...*hey.Way) (int64, error)
+    Insert(create interface{}, ways ...*hey.Way) (int64, error)
     Delete(where hey.Filter, ways ...*hey.Way) (int64, error)
     Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error)
     InsertOne(create interface{}, ways ...*hey.Way) (int64, error)
+    InsertSelect(column []string, get *hey.Get, ways ...*hey.Way) (int64, error)
     SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error)
+    SelectQuery(where hey.Filter, custom func(get *hey.Get), query func(rows *sql.Rows) error, ways ...*hey.Way) error
+    SelectGet(where hey.Filter, custom func(get *hey.Get), receive interface{}, ways ...*hey.Way) error
+    SelectExists(where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (bool, error)
+    SelectCountGet(where hey.Filter, custom func(get *hey.Get), receive interface{}, ways ...*hey.Way) (int64, error)
+    DeleteByColumn(column string, values interface{}, filters ...hey.Filter) (int64, error)
+    UpdateByColumn(column string, values interface{}, modify interface{}, filters ...hey.Filter) (int64, error)
+    SelectExistsByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get)) (bool, error)
+    SelectGetByColumn(column string, values interface{}, receive interface{}, customs ...func(f hey.Filter, g *hey.Get)) error
+
+    PrimaryKeyUpdate(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyHidden(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyDelete(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyUpsert(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyUpdateAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyHiddenAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyDeleteAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyUpsertAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyEqual(value interface{}) hey.Filter
+    PrimaryKeyIn(values ...interface{}) hey.Filter
+    PrimaryKeyUpdateMap(primaryKey interface{}, modify map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyUpsertMap(primaryKey interface{}, upsert map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyDeleteFilter(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeySelectExists(primaryKey interface{}, filter hey.Filter, ways ...*hey.Way) (bool, error)
+    PrimaryKeySelectCount(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error)
+    PrimaryKeyExists(primaryKey interface{}, ways ...*hey.Way) (bool, error)
+
+    ValueStruct() interface{}
+    ValueStructPtr() interface{}
+    ValueSliceStruct(capacities ...int) interface{}
+    ValueSliceStructPtr(capacities ...int) interface{}
 }
 
 type AllTable struct {
@@ -106,9 +148,4 @@ func (s *AllTable) TableSlice() []string {
 func (s *AllTable) TableExists(table string) bool {
 	_, ok := s.schemaMap[table]
 	return ok
-}
-
-// PrimaryKey Used to obtain the primary key column value of the database table.
-type PrimaryKey interface {
-	PrimaryKey() interface{}
 }

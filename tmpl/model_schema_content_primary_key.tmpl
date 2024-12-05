@@ -211,20 +211,12 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteFilter(primaryKeys inter
 
 // PrimaryKeySelectAll Query multiple records based on primary key values. Additional conditions can be added in the filter.
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAll(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
-	return s.SelectAll(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(get *hey.Get) {
-		if custom != nil {
-			custom(get)
-		}
-	}, ways...)
+	return s.SelectAll(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), custom, ways...)
 }
 
 // PrimaryKeySelectOne Query a piece of data based on the primary key value. Additional conditions can be added in the filter.
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectOne(primaryKey interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
-	return s.SelectOne(s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available()), func(get *hey.Get) {
-		if custom != nil {
-			custom(get)
-		}
-	}, ways...)
+	return s.SelectOne(s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available()), custom, ways...)
 }
 
 // PrimaryKeySelectExists Check whether the data exists based on the primary key value. Additional conditions can be added in the filter.
@@ -248,33 +240,21 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectCount(primaryKeys interf
     {{{ if eq .PrimaryKeyType "string" }}}
 // PrimaryKeySelectAllMap Make map[string]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
-    return s.SelectAllMap(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, func(get *hey.Get) {
-        if custom != nil {
-            custom(get)
-        }
-    }, ways...)
+    return s.SelectAllMap(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 
     {{{ if eq .PrimaryKeyType "int" }}}
 // PrimaryKeySelectAllMap Make map[int]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
-	return s.SelectAllMapInt(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, func(get *hey.Get) {
-        if custom != nil {
-            custom(get)
-        }
-    }, ways...)
+	return s.SelectAllMapInt(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 
     {{{ if eq .PrimaryKeyType "int64" }}}
 // PrimaryKeySelectAllMap Make map[int64]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
 func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
-    return s.SelectAllMapInt64(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, func(get *hey.Get) {
-        if custom != nil {
-            custom(get)
-        }
-    }, ways...)
+    return s.SelectAllMapInt64(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 {{{ end }}}
