@@ -77,11 +77,11 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) ColumnDeletedAt() []string {
 	return {{{.ColumnDeletedAt}}}
 }
 
-func (s *SCHEMA{{{.OriginNamePascal}}}) Filter(filters ...func(f hey.Filter, t *SCHEMA{{{.OriginNamePascal}}})) hey.Filter {
+func (s *SCHEMA{{{.OriginNamePascal}}}) Filter(filters ...func(f hey.Filter)) hey.Filter {
 	filter := s.way.F()
 	for _, tmp := range filters {
 		if tmp != nil {
-			tmp(filter, s)
+			tmp(filter)
 		}
 	}
 	return filter
@@ -111,7 +111,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Way(ways ...*hey.Way) *hey.Way {
 }
 
 func (s *SCHEMA{{{.OriginNamePascal}}}) Available() hey.Filter {
-	return s.Filter(func(f hey.Filter, t *SCHEMA{{{.OriginNamePascal}}}) {
+	return s.Filter(func(f hey.Filter) {
 		for _, v := range s.ColumnDeletedAt() {
 			f.Equal(v, 0)
 		}
@@ -191,10 +191,10 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCount(where hey.Filter, ways ...*h
 }
 
 // SelectQuery SQL SELECT.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), query func(rows *sql.Rows) error, ways ...*hey.Way) error {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectQuery(where hey.Filter, custom func(get *hey.Get), query func(rows *sql.Rows) error, ways ...*hey.Way) error {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
-		custom(get, s)
+		custom(get)
 	}
 	return get.Query(query)
 }
@@ -205,19 +205,19 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) EmptySlice() []*{{{.OriginNamePascal}}} 
 }
 
 // SelectGet SQL SELECT.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) error {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectGet(where hey.Filter, custom func(get *hey.Get), receive interface{}, ways ...*hey.Way) error {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
-		custom(get, s)
+		custom(get)
 	}
 	return get.Get(receive)
 }
 
 // SelectAll SQL SELECT ALL.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
 	get := s.Get(ways...).Where(where)
 	if custom != nil {
-		custom(get, s)
+		custom(get)
 	}
 	all := s.EmptySlice()
 	err := get.Get(&all)
@@ -228,10 +228,10 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAll(where hey.Filter, custom func(
 }
 
 // SelectOne SQL SELECT ONE.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
-	all, err := s.SelectAll(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	all, err := s.SelectAll(where, func(get *hey.Get) {
 		if custom != nil {
-			custom(get, t)
+			custom(get)
 		}
 		get.Limit(1)
 	}, ways...)
@@ -245,10 +245,10 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOne(where hey.Filter, custom func(
 }
 
 // SelectExists SQL SELECT EXISTS.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (bool, error) {
-	exists, err := s.SelectOne(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (bool, error) {
+	exists, err := s.SelectOne(where, func(get *hey.Get) {
 		if custom != nil {
-			custom(get, t)
+			custom(get)
 		}
 		get.Column(s.Column()[0])
 	}, ways...)
@@ -259,7 +259,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom fu
 }
 
 // SelectCountAll SQL SELECT COUNT + ALL.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (int64, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom func(get *hey.Get), ways ...*hey.Way) (int64, []*{{{.OriginNamePascal}}}, error) {
 	total, err := s.SelectCount(where, ways...)
 	if err != nil {
 		return 0, nil, err
@@ -275,7 +275,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountAll(where hey.Filter, custom 
 }
 
 // SelectCountGet SQL SELECT COUNT + GET.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), receive interface{}, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom func(get *hey.Get), receive interface{}, ways ...*hey.Way) (int64, error) {
 	count, err := s.SelectCount(where, ways...)
 	if err != nil {
 		return 0, err
@@ -290,7 +290,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom 
 }
 
 // SelectAllMap Make map[string]*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) string, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[string]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) string, custom func(get *hey.Get), ways ...*hey.Way) (map[string]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -303,7 +303,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMap(where hey.Filter, makeMapKe
 }
 
 // SelectAllMapInt Make map[int]*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int, custom func(get *hey.Get), ways ...*hey.Way) (map[int]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -316,7 +316,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt(where hey.Filter, makeMa
 }
 
 // SelectAllMapInt64 Make map[int64]*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int64, custom func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}), ways ...*hey.Way) (map[int64]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllMapInt64(where hey.Filter, makeMapKey func(v *{{{.OriginNamePascal}}}) int64, custom func(get *hey.Get), ways ...*hey.Way) (map[int64]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	all, err := s.SelectAll(where, custom, ways...)
 	if err != nil {
 		return nil, nil, err
@@ -345,12 +345,12 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) UpdateByColumn(column string, values int
 }
 
 // SelectAllByColumn Select all by column values. no transaction support.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) ([]*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get)) ([]*{{{.OriginNamePascal}}}, error) {
 	where := s.Filter().In(column, values)
-	return s.SelectAll(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+	return s.SelectAll(where, func(get *hey.Get) {
 		for _, custom := range customs {
 			if custom != nil {
-				custom(where, get, t)
+				custom(where, get)
 				break
 			}
 		}
@@ -358,12 +358,12 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectAllByColumn(column string, values 
 }
 
 // SelectOneByColumn Select one by column values. no transaction support.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOneByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) (*{{{.OriginNamePascal}}}, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOneByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get)) (*{{{.OriginNamePascal}}}, error) {
 	where := s.Filter().In(column, values)
-	return s.SelectOne(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+	return s.SelectOne(where, func(get *hey.Get) {
 		for _, custom := range customs {
 			if custom != nil {
-				custom(where, get, t)
+				custom(where, get)
 				break
 			}
 		}
@@ -371,12 +371,12 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectOneByColumn(column string, values 
 }
 
 // SelectExistsByColumn Select exists by column values. no transaction support.
-func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExistsByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get, t *SCHEMA{{{.OriginNamePascal}}})) (bool, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExistsByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get)) (bool, error) {
 	where := s.Filter().In(column, values)
-	return s.SelectExists(where, func(get *hey.Get, t *SCHEMA{{{.OriginNamePascal}}}) {
+	return s.SelectExists(where, func(get *hey.Get) {
 		for _, custom := range customs {
 			if custom != nil {
-				custom(where, get, t)
+				custom(where, get)
 				break
 			}
 		}
