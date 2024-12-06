@@ -87,27 +87,27 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Filter(filters ...func(f hey.Filter)) he
 	return filter
 }
 
+func (s *SCHEMA{{{.OriginNamePascal}}}) Way(ways ...*hey.Way) *hey.Way {
+	return AutoSelectWay(s.way, ways...)
+}
+
 func (s *SCHEMA{{{.OriginNamePascal}}}) Add(ways ...*hey.Way) *hey.Add {
 	except := s.ColumnAutoIncr()
-	return AutoSelectWay(s.way, ways...).Add(s.Table()).Except(except...).Permit(s.Column(except...)...)
+	return s.Way(ways...).Add(s.Table()).Except(except...).Permit(s.Column(except...)...)
 }
 
 func (s *SCHEMA{{{.OriginNamePascal}}}) Del(ways ...*hey.Way) *hey.Del {
-	return AutoSelectWay(s.way, ways...).Del(s.Table())
+	return s.Way(ways...).Del(s.Table())
 }
 
 func (s *SCHEMA{{{.OriginNamePascal}}}) Mod(ways ...*hey.Way) *hey.Mod {
 	except := s.ColumnAutoIncr()
 	except = append(except, s.ColumnCreatedAt()...)
-	return AutoSelectWay(s.way, ways...).Mod(s.Table()).Except(except...).Permit(s.Column(except...)...)
+	return s.Way(ways...).Mod(s.Table()).Except(except...).Permit(s.Column(except...)...)
 }
 
 func (s *SCHEMA{{{.OriginNamePascal}}}) Get(ways ...*hey.Way) *hey.Get {
-	return AutoSelectWay(s.way, ways...).Get(s.Table()).Column(s.Column()...)
-}
-
-func (s *SCHEMA{{{.OriginNamePascal}}}) Way(ways ...*hey.Way) *hey.Way {
-	return AutoSelectWay(s.way, ways...)
+	return s.Way(ways...).Get(s.Table()).Column(s.Column()...)
 }
 
 func (s *SCHEMA{{{.OriginNamePascal}}}) Available() hey.Filter {
@@ -152,8 +152,8 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*hey.Wa
 
 // Update SQL UPDATE.
 func (s *SCHEMA{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error) {
-	modify := s.Mod(ways...)
     filter := s.Filter()
+    modify := s.Mod(ways...)
     if update != nil {
         update(filter, modify)
     }
@@ -188,10 +188,13 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways ...*h
 }
 
 // InsertSelect SQL INSERT SELECT.
-func (s *SCHEMA{{{.OriginNamePascal}}}) InsertSelect(column []string, get *hey.Get, ways ...*hey.Way) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) InsertSelect(columns []string, get *hey.Get, ways ...*hey.Way) (int64, error) {
+    if len(columns) == 0 || get == nil {
+		return 0, nil
+	}
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
 	defer cancel()
-	return s.Add(ways...).Context(ctx).ValuesSubQueryGet(get, column...).Add()
+	return s.Add(ways...).Context(ctx).ValuesSubQueryGet(get, columns...).Add()
 }
 
 // SelectCount SQL SELECT COUNT.
@@ -259,7 +262,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectExists(where hey.Filter, custom fu
 		if custom != nil {
 			custom(get)
 		}
-		get.Column(s.Column()[0])
+		get.Column(s.columnSlice[0])
 	}, ways...)
 	if err != nil {
 		return false, err
@@ -289,7 +292,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) SelectCountGet(where hey.Filter, custom 
 	if err != nil {
 		return 0, err
 	}
-	if count <= 0 {
+	if count == 0 {
 		return 0, nil
 	}
 	if err = s.SelectGet(where, custom, receive, ways...); err != nil {

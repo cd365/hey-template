@@ -35,7 +35,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey PrimaryKey, 
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
         f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
         u.Modify(updates)
-    }, ways...)
+    }, way)
 }
 
 // PrimaryKeyDelete Delete based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
@@ -180,8 +180,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface
 	if primaryKey == nil {
 		return s.Insert(upsert, ways...)
 	}
-	where := s.PrimaryKeyEqual(primaryKey)
-	exists, err := s.SelectExists(s.Filter().Use(where, filter, s.Available()), func(get *hey.Get) { get.Column(s.{{{.PrimaryKeyUpper}}}) }, ways...)
+	exists, err := s.PrimaryKeySelectExists(primaryKey, filter, ways...)
 	if err != nil {
 		return 0, err
 	}
@@ -189,7 +188,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface
 		return s.Insert(upsert, ways...)
 	}
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-		f.Use(where, filter)
+		f.Use(s.PrimaryKeyEqual(primaryKey), filter)
 		u.Modify(upsert)
 	}, ways...)
 }
@@ -214,7 +213,11 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey interf
 	if primaryKey == nil {
 		return false, nil
 	}
-	return s.SelectExists(s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available()), func(get *hey.Get) { get.Column(s.{{{.PrimaryKeyUpper}}}) }, ways...)
+	exists, err := s.PrimaryKeySelectOne(primaryKey, func(get *hey.Get) { get.Column(s.{{{.PrimaryKeyUpper}}}) }, filter, ways...)
+    if err != nil {
+        return false, err
+    }
+    return exists != nil, nil
 }
 
 // PrimaryKeySelectCount The number of statistics based on primary key values. Additional conditions can be added in the filter.

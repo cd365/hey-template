@@ -3,7 +3,7 @@ module main
 go 1.18
 
 require (
-	github.com/cd365/hey/v2 v2.0.0
+	github.com/cd365/hey/v2 v2.0.1
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/lib/pq v1.10.9
 	gopkg.in/yaml.v3 v3.0.1
