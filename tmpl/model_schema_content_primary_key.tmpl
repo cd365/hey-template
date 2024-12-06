@@ -59,20 +59,23 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, 
 	}
 	pk := primaryKey.PrimaryKey()
 	if pk == nil {
-		return s.Add(ways...).Default(func(o *hey.Add) {
-            timestamp := o.Way().Now().Unix()
-            for _, v := range s.ColumnCreatedAt() {
-                o.FieldValue(v, timestamp)
-            }
-        }).Create(primaryKey).ReturningId()
+		ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+        defer cancel()
+        return s.Add(ways...).Context(ctx).
+            Default(func(o *hey.Add) {
+                timestamp := o.Way().Now().Unix()
+                for _, v := range s.ColumnCreatedAt() {
+                    o.FieldValue(v, timestamp)
+                }
+            }).Create(primaryKey).ReturningId()
 	}
 	return s.PrimaryKeyUpdate(primaryKey, filter, ways...)
 }
 
 // PrimaryKeyUpdateAll Batch update based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).TransactionContext(ctx, 1, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyUpdate(tmp, nil, tx); err != nil {
 				return err
@@ -81,7 +84,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(ctx context.Context,
 			}
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -89,9 +92,9 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(ctx context.Context,
 }
 
 // PrimaryKeyHiddenAll Batch hidden based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).TransactionContext(ctx, 1, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyHidden(tmp, nil, tx); err != nil {
 				return err
@@ -100,7 +103,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(ctx context.Context,
 			}
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -108,9 +111,9 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(ctx context.Context,
 }
 
 // PrimaryKeyDeleteAll Batch delete based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).TransactionContext(ctx, 1, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyDelete(tmp, nil, tx); err != nil {
 				return err
@@ -119,7 +122,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(ctx context.Context,
 			}
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -127,23 +130,18 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(ctx context.Context,
 }
 
 // PrimaryKeyUpsertAll Batch upsert based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	var err error
     var num int64
-	err = s.Way(way).TransactionContext(ctx, 1, func(tx *hey.Way) error {
+	err = s.Way(way).Transaction(func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if tmp == nil {
                 continue
             }
             pk := tmp.PrimaryKey()
             if pk == nil {
-                num, err = s.Add(tx).Default(func(o *hey.Add) {
-                    timestamp := o.Way().Now().Unix()
-                    for _, v := range s.ColumnCreatedAt() {
-                        o.FieldValue(v, timestamp)
-                    }
-                }).Create(tmp).Add()
+                num, err = s.Insert(tmp, tx)
             } else {
                 num, err = s.PrimaryKeyUpdate(tmp, nil, tx)
             }
@@ -154,7 +152,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(ctx context.Context,
             }
 		}
 		return nil
-	}, nil)
+	})
 	if err != nil {
 		return 0, err
 	}

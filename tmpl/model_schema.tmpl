@@ -4,7 +4,6 @@
 package model
 
 import (
-    "context"
     "database/sql"
 	"github.com/cd365/hey/v2"
 )
@@ -91,10 +90,10 @@ type Table interface {
     PrimaryKeyHidden(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
     PrimaryKeyDelete(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
     PrimaryKeyUpsert(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
-    PrimaryKeyUpdateAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
-    PrimaryKeyHiddenAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
-    PrimaryKeyDeleteAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
-    PrimaryKeyUpsertAll(ctx context.Context, way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyUpdateAll(way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyHiddenAll(way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyDeleteAll(way *hey.Way, pks ...PrimaryKey) (int64, error)
+    PrimaryKeyUpsertAll(way *hey.Way, pks ...PrimaryKey) (int64, error)
     PrimaryKeyEqual(value interface{}) hey.Filter
     PrimaryKeyIn(values ...interface{}) hey.Filter
     PrimaryKeyUpdateMap(primaryKey interface{}, modify map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error)

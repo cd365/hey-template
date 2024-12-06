@@ -170,12 +170,15 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.
 
 // InsertOne Insert a record and return the auto-increment id.
 func (s *SCHEMA{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways ...*hey.Way) (int64, error) {
-	return s.Add(ways...).Default(func(o *hey.Add) {
-		timestamp := o.Way().Now().Unix()
-		for _, v := range s.ColumnCreatedAt() {
-			o.FieldValue(v, timestamp)
-		}
-	}).Create(create).ReturningId()
+	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+    defer cancel()
+    return s.Add(ways...).Context(ctx).
+        Default(func(o *hey.Add) {
+            timestamp := o.Way().Now().Unix()
+            for _, v := range s.ColumnCreatedAt() {
+                o.FieldValue(v, timestamp)
+            }
+        }).Create(create).ReturningId()
 }
 
 // InsertSelect SQL INSERT SELECT.
