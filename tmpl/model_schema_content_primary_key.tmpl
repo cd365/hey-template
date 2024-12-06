@@ -59,15 +59,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, 
 	}
 	pk := primaryKey.PrimaryKey()
 	if pk == nil {
-		ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
-        defer cancel()
-        return s.Add(ways...).Context(ctx).
-            Default(func(o *hey.Add) {
-                timestamp := o.Way().Now().Unix()
-                for _, v := range s.ColumnCreatedAt() {
-                    o.FieldValue(v, timestamp)
-                }
-            }).Create(primaryKey).ReturningId()
+		return s.InsertOne(primaryKey, ways...)
 	}
 	return s.PrimaryKeyUpdate(primaryKey, filter, ways...)
 }

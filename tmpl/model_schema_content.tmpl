@@ -120,6 +120,9 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Available() hey.Filter {
 
 // Insert SQL INSERT.
 func (s *SCHEMA{{{.OriginNamePascal}}}) Insert(create interface{}, ways ...*hey.Way) (int64, error) {
+    if create == nil {
+        return 0, nil
+    }
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
 	defer cancel()
 	return s.Add(ways...).
@@ -149,20 +152,20 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...*hey.Wa
 
 // Update SQL UPDATE.
 func (s *SCHEMA{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.Mod), ways ...*hey.Way) (int64, error) {
-	modify := s.Mod(ways...).
-		Default(func(o *hey.Mod) {
-			timestamp := o.Way().Now().Unix()
-			for _, v := range s.ColumnUpdatedAt() {
-				o.Set(v, timestamp)
-			}
-		})
-	filter := s.Filter()
-	if update != nil {
-		update(filter, modify)
-	}
-	if filter.IsEmpty() {
-		return 0, nil
-	}
+	modify := s.Mod(ways...)
+    filter := s.Filter()
+    if update != nil {
+        update(filter, modify)
+    }
+    if filter.IsEmpty() {
+        return 0, nil
+    }
+    modify.Default(func(o *hey.Mod) {
+        timestamp := o.Way().Now().Unix()
+        for _, v := range s.ColumnUpdatedAt() {
+            o.Set(v, timestamp)
+        }
+    })
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
 	defer cancel()
 	return modify.Context(ctx).Where(filter.Use(s.Available())).Mod()
@@ -170,6 +173,9 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, u *hey.
 
 // InsertOne Insert a record and return the auto-increment id.
 func (s *SCHEMA{{{.OriginNamePascal}}}) InsertOne(create interface{}, ways ...*hey.Way) (int64, error) {
+    if create == nil {
+		return 0, nil
+	}
 	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
     defer cancel()
     return s.Add(ways...).Context(ctx).
