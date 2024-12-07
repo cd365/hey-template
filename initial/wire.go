@@ -11,7 +11,7 @@ import (
 	"github.com/google/wire"
 )
 
-func Init(ctx context.Context, cfg *app.Config) (*app.App, error) {
+func inject(ctx context.Context, cfg *app.Config) (*app.App, error) {
 	wire.Build(provider.WireProviderSet)
 	return &app.App{}, nil
 }

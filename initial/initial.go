@@ -43,7 +43,7 @@ func Start() {
 	}
 
 	// 初始化
-	sss, err := Init(context.Background(), cfg)
+	sss, err := inject(context.Background(), cfg)
 	if err != nil {
 		fmt.Println("initial failed.", err.Error())
 		return

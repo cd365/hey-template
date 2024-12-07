@@ -13,7 +13,7 @@ import (
 
 // Injectors from wire.go:
 
-func Init(ctx context.Context, cfg *app.Config) (*app.App, error) {
+func inject(ctx context.Context, cfg *app.Config) (*app.App, error) {
 	appApp := app.NewApp(ctx, cfg)
 	return appApp, nil
 }
