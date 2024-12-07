@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	_ "embed"
@@ -20,9 +20,9 @@ var (
 	//go:embed tmpl/model_schema_content_primary_key.tmpl
 	tmplModelSchemaContentPrimaryKey []byte
 
-	//go:embed pgsql/func_create.sql
+	//go:embed tmpl/pgsql/func_create.sql
 	pgsqlFuncCreate string
 
-	//go:embed pgsql/func_drop.sql
+	//go:embed tmpl/pgsql/func_drop.sql
 	pgsqlFuncDrop string
 )

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"database/sql"
@@ -8,16 +8,16 @@ import (
 	"sync"
 )
 
-type pgsql1 struct {
+type HelperPgsql struct {
 	app    *App
-	tables []*SysTable
+	tables []*SchemaTable
 }
 
-func Pgsql(app *App) Helper {
-	return &pgsql1{app: app}
+func NewPgsql(app *App) Helper {
+	return &HelperPgsql{app: app}
 }
 
-func (s *pgsql1) QueryAll() (err error) {
+func (s *HelperPgsql) QueryAllTable() (err error) {
 	schema := s.app.cfg.TableSchemaName
 	prepare := "SELECT table_schema, table_name FROM information_schema.tables WHERE ( table_schema = ? AND table_type = 'BASE TABLE' ) ORDER BY table_name ASC"
 	if err = s.app.way.TakeAll(&s.tables, prepare, schema); err != nil {
@@ -28,7 +28,7 @@ func (s *pgsql1) QueryAll() (err error) {
 	for _, table := range s.tables {
 		table.app = s.app
 		wg.Add(1)
-		go func(table *SysTable) {
+		go func(table *SchemaTable) {
 			defer wg.Done()
 			columns, qer := s.queryColumns(schema, table)
 			if qer != nil {
@@ -45,7 +45,7 @@ func (s *pgsql1) QueryAll() (err error) {
 	return
 }
 
-func (s *pgsql1) queryComment(schema string, table *SysTable) (err error) {
+func (s *HelperPgsql) queryComment(schema string, table *SchemaTable) (err error) {
 	if table.TableName == nil || schema == "" {
 		return
 	}
@@ -73,14 +73,14 @@ func (s *pgsql1) queryComment(schema string, table *SysTable) (err error) {
 	return
 }
 
-func (s *pgsql1) queryColumns(schema string, table *SysTable) (list []*SysColumn, err error) {
+func (s *HelperPgsql) queryColumns(schema string, table *SchemaTable) (list []*SchemaColumn, err error) {
 	if schema == "" || table == nil || table.TableName == nil || *table.TableName == "" {
 		return
 	}
 	prepare := "SELECT table_schema, table_name, column_name, ordinal_position, column_default, is_nullable, data_type, character_maximum_length, character_octet_length, numeric_precision, numeric_scale, character_set_name, collation_name FROM information_schema.columns WHERE ( table_schema = ? AND table_name = ? ) ORDER BY ordinal_position ASC"
 	err = s.app.way.Query(func(rows *sql.Rows) (err error) {
 		for rows.Next() {
-			tmp := &SysColumn{}
+			tmp := &SchemaColumn{}
 			if err = rows.Scan(
 				&tmp.TableSchema,
 				&tmp.TableName,
@@ -133,13 +133,13 @@ func (s *pgsql1) queryColumns(schema string, table *SysTable) (list []*SysColumn
 	return
 }
 
-func (s *pgsql1) AllTable() []*SysTable {
+func (s *HelperPgsql) GetAllTable() []*SchemaTable {
 	return s.tables
 }
 
 var pgSeq = regexp.MustCompile(`^nextval\('([A-Za-z0-9_]+)'::regclass\)$`)
 
-func (s *pgsql1) TableDdl(table *SysTable) error {
+func (s *HelperPgsql) QueryTableDefineSql(table *SchemaTable) error {
 	var createSequence string
 	for _, c := range table.Column {
 		if c.ColumnDefault == nil {

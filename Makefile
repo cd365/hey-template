@@ -1,15 +1,18 @@
 program=$(shell /bin/bash ./script/program.bash)
 
-all: fmt linux
+all: wire fmt build
+
+wire:
+	@cd initial;wire;cd -
 
 fmt:
-	./script/fmt.bash
+	@./script/fmt.bash
 
-linux:
-	./script/linux.bash ${program}
+build:
+	@./script/build.bash ${program}
 
 upx:
-	upx -9 ${program}
+	@upx -9 ${program}
 
 clean:
 	rm -f ${program}

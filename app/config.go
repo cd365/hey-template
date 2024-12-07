@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -8,9 +8,9 @@ import (
 )
 
 type Config struct {
-	Version string `json:"version" yaml:"version"`   // 构建版本
-	BuildAt string `json:"build_at" yaml:"build_at"` // 构建时间
-	GitHash string `json:"git_hash" yaml:"git_hash"` // GIT提交HASH值
+	Version  string `json:"version" yaml:"version"`     // 构建版本
+	BuildAt  string `json:"build_at" yaml:"build_at"`   // 构建时间
+	CommitId string `json:"commit_id" yaml:"commit_id"` // GIT提交HASH值
 
 	Driver         string `json:"driver" yaml:"driver"`                     // 数据库驱动名称 mysql|postgres
 	DataSourceName string `json:"data_source_name" yaml:"data_source_name"` // 数据源地址 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
@@ -22,8 +22,6 @@ type Config struct {
 	ColumnCreatedAt string `json:"column_created_at" yaml:"column_created_at"` // 表数据创建时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnUpdatedAt string `json:"column_updated_at" yaml:"column_updated_at"` // 表数据更新时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnDeletedAt string `json:"column_deleted_at" yaml:"column_deleted_at"` // 表数据伪删除时间标记字段 通常是int或者int64类型 多个使用','隔开
-
-	UsingWire bool `json:"using_wire" yaml:"using_wire"` // 是否生成 github.com/google/wire 需要的 ProviderSet
 
 	ImportPrefixPackageName string `json:"import_prefix_package_name" yaml:"import_prefix_package_name"` // 导入包名前缀 默认main
 	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"`   // 模板文件输出路径
@@ -78,7 +76,8 @@ func (s *Config) Disable(table string) bool {
 	return false
 }
 
-func SetConfig(configFile string) error {
+// InitConfig 初始化默认配置
+func InitConfig(configFile string) error {
 	fil, err := os.OpenFile(configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
@@ -87,7 +86,7 @@ func SetConfig(configFile string) error {
 	config := &Config{
 		Version:                 "v0.0.1",
 		BuildAt:                 "20200303080000",
-		GitHash:                 "0000000000000000000000000000000000000000",
+		CommitId:                "0000000000000000000000000000000000000000",
 		Driver:                  "postgres",
 		DataSourceName:          "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
 		TableSchemaName:         "public",
@@ -111,7 +110,7 @@ func SetConfig(configFile string) error {
 	return nil
 }
 
-func GetConfig(configFile string) (*Config, error) {
+func ReadConfig(configFile string) (*Config, error) {
 	stat, err := os.Stat(configFile)
 	if err != nil {
 		return nil, err

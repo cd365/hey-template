@@ -1,55 +1,151 @@
-package main
+package app
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"github.com/cd365/hey/v2"
+	"io"
+	"path/filepath"
+	"root/utils"
+	"root/values"
 	"strings"
+	"text/template"
+	"time"
+	"unsafe"
+
+	"github.com/cd365/hey/v2"
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
 )
 
-type TmplWire struct {
-	Version string // 模板版本
-	Package string // 包名
-	Content string // 内容
+const (
+	byte34              = '"'
+	byte96              = '`'
+	templateLeft        = "{{{"
+	templateRight       = "}}}"
+	tableFilenamePrefix = "zzz_"
+	tableFilenameSuffix = "_aaa"
+	tableFilenameGo     = ".go"
+)
+
+type Helper interface {
+	QueryAllTable() error
+	GetAllTable() []*SchemaTable
+	QueryTableDefineSql(table *SchemaTable) error
 }
 
-func (s *App) MakeTmplWire(pkg string, suffixName string, customLines ...string) error {
-	w := &TmplWire{
-		Version: s.Version,
-		Package: pkg,
+type App struct {
+	Version string
+
+	cfg *Config
+
+	way *hey.Way // 数据库连接对象
+
+	helper Helper // 数据接口
+}
+
+func NewApp(
+	ctx context.Context,
+	cfg *Config,
+) *App {
+	_ = ctx
+	return &App{
+		Version: values.Version,
+		cfg:     cfg,
 	}
-	temp := NewTemplate("tmp_wire", tmplWire)
-	text := bytes.NewBuffer(nil)
-	newTable := func(i int, table *SysTable) string {
-		tmp := fmt.Sprintf("New%s%s,", table.pascal(), suffixName)
-		if i > 0 {
-			tmp = fmt.Sprintf("\n\t%s", tmp)
-		}
-		comment := table.comment()
-		if comment != "" {
-			tmp = fmt.Sprintf("%s // %s", tmp, comment)
-		}
-		return tmp
-	}
-	buffer := bytes.NewBuffer(nil)
-	for index, table := range s.AllTable(false) {
-		buffer.WriteString(newTable(index, table))
-	}
-	for _, v := range customLines {
-		buffer.WriteString(v)
-	}
-	w.Content = buffer.String()
-	if err := temp.Execute(text, w); err != nil {
+}
+
+func (s *App) initial() error {
+	cfg := s.cfg
+	cfg.Driver = strings.TrimSpace(cfg.Driver)
+	way, err := hey.NewWay(cfg.Driver, cfg.DataSourceName)
+	if err != nil {
 		return err
 	}
-	suffix := ".go"
-	switch pkg {
-	case "biz":
-		suffix = ".tmp"
+	s.way = way
+	db := way.DB()
+	db.SetMaxOpenConns(8)
+	db.SetMaxIdleConns(2)
+	db.SetConnMaxIdleTime(time.Minute * 3)
+	db.SetConnMaxLifetime(time.Minute * 3)
+	switch cfg.Driver {
+	case hey.DriverNameMysql:
+		cfg.DatabaseIdentify = "`"
+		s.helper = NewMysql(s)
+		if cfg.TableSchemaName == "" {
+			start := strings.Index(cfg.DataSourceName, "/")
+			if start > -1 {
+				end := strings.Index(cfg.DataSourceName, "?")
+				if end > -1 {
+					cfg.TableSchemaName = cfg.DataSourceName[start+1 : end]
+				} else {
+					cfg.TableSchemaName = cfg.DataSourceName[start+1:]
+				}
+			}
+			cfg.TableSchemaName = strings.TrimSpace(cfg.TableSchemaName)
+		}
+	case hey.DriverNamePostgres:
+		cfg.DatabaseIdentify = `"`
+		s.helper = NewPgsql(s)
+		if cfg.TableSchemaName == "" {
+			cfg.TableSchemaName = "public"
+		}
+	default:
+		return fmt.Errorf("unsupported driver name: %s", cfg.Driver)
 	}
-	filename := pathJoin(s.cfg.TemplateOutputDirectory, w.Package, fmt.Sprintf("%s%s", w.Package, suffix))
-	if err := s.WriteFile(text, filename); err != nil {
+	return nil
+}
+
+func (s *App) writeFile(reader io.Reader, filename string) error {
+	fil, err := utils.RemoveCreateFile(filename)
+	if err != nil {
 		return err
+	}
+	defer func() { _ = fil.Close() }()
+	_, err = io.Copy(fil, reader)
+	return err
+}
+
+func (s *App) getAllTable(all bool) []*SchemaTable {
+	if all {
+		return s.helper.GetAllTable()
+	}
+	allTable := s.helper.GetAllTable()
+	length := len(allTable)
+	result := make([]*SchemaTable, 0, length)
+	for i := 0; i < length; i++ {
+		if s.cfg.Disable(*allTable[i].TableName) {
+			continue
+		}
+		result = append(result, allTable[i])
+	}
+	return result
+}
+
+func (s *App) BuildAll() error {
+	if err := s.initial(); err != nil {
+		return err
+	}
+	if s.cfg.Driver == hey.DriverNamePostgres {
+		if _, err := s.way.DB().Exec(pgsqlFuncCreate); err != nil {
+			return err
+		}
+		defer func() { _, _ = s.way.DB().Exec(pgsqlFuncDrop) }()
+	}
+	if err := s.helper.QueryAllTable(); err != nil {
+		return err
+	}
+	for _, table := range s.getAllTable(true) {
+		if err := s.helper.QueryTableDefineSql(table); err != nil {
+			return err
+		}
+	}
+	writer := make([]func() error, 0, 8)
+	writer = append(writer, s.Model)
+	for _, w := range writer {
+		if err := w(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -63,7 +159,7 @@ type TableColumnPrimaryKey struct {
 }
 
 type TmplTableModel struct {
-	table *SysTable
+	table *SchemaTable
 
 	Version string // 模板版本
 
@@ -95,7 +191,7 @@ type TmplTableModel struct {
 	PrimaryKey string // 主键自定义方法
 }
 
-func (s *TmplTableModel) Make() {
+func (s *TmplTableModel) prepare() error {
 
 	// struct define
 	for i, c := range s.table.Column {
@@ -156,8 +252,8 @@ func (s *TmplTableModel) Make() {
 			s96 := string(byte96) // `
 			s34 := `"`            // "
 			s.StructColumnSchemaFieldSlice = strings.Join(field, ", ")
-			switch s.table.app.TypeDriver() {
-			case DriverMysql:
+			switch s.table.app.cfg.Driver {
+			case hey.DriverNameMysql:
 				s.StructColumnSchemaFieldSlice = strings.ReplaceAll(s.StructColumnSchemaFieldSlice, s34, s96)
 			}
 			if strings.Contains(s.StructColumnSchemaFieldSlice, s96) {
@@ -185,7 +281,7 @@ func (s *TmplTableModel) Make() {
 	// table special fields
 	{
 		// auto increment field or timestamp field
-		cm := make(map[string]*SysColumn)
+		cm := make(map[string]*SchemaColumn)
 		for _, v := range s.table.Column {
 			if v.ColumnName == nil || *v.ColumnName == "" {
 				continue
@@ -225,7 +321,7 @@ func (s *TmplTableModel) Make() {
 		ignore = append(ignore, deleted[:]...)
 
 		if len(autoIncrement) > 0 && autoIncrement[0] != "" {
-			s.ColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", upper(autoIncrement[0]))
+			s.ColumnAutoIncr = fmt.Sprintf("[]string{ s.%s }", utils.Upper(autoIncrement[0]))
 		} else {
 			s.ColumnAutoIncr = "nil"
 		}
@@ -235,7 +331,7 @@ func (s *TmplTableModel) Make() {
 				return "nil"
 			}
 			for i := 0; i < length; i++ {
-				cols[i] = fmt.Sprintf("s.%s", upper(cols[i]))
+				cols[i] = fmt.Sprintf("s.%s", utils.Upper(cols[i]))
 			}
 			return fmt.Sprintf("[]string{ %s }", strings.Join(cols, ", "))
 		}
@@ -314,7 +410,7 @@ func (s *TmplTableModel) Make() {
 				tablePascal,
 				columnPascal,
 				c.databaseTypeToGoType(),
-				underline(*c.ColumnName),
+				utils.Underline(*c.ColumnName),
 				comment,
 				tablePascal,
 				columnPascal,
@@ -346,8 +442,8 @@ func (s *TmplTableModel) Make() {
 		buffer := bytes.NewBuffer(nil)
 		data := &TableColumnPrimaryKey{
 			OriginNamePascal:      s.table.pascal(),
-			PrimaryKeyPascal:      pascal(s.table.TableFieldSerial),
-			PrimaryKeySmallPascal: pascalSmall(s.table.TableFieldSerial),
+			PrimaryKeyPascal:      utils.Pascal(s.table.TableFieldSerial),
+			PrimaryKeySmallPascal: utils.PascalFirstLower(s.table.TableFieldSerial),
 			PrimaryKeyUpper:       strings.ToUpper(s.table.TableFieldSerial),
 		}
 		for _, c := range s.table.Column {
@@ -357,12 +453,13 @@ func (s *TmplTableModel) Make() {
 			}
 		}
 		if err := tmpl.Execute(buffer, data); err != nil {
-			return
+			return err
 		} else {
 			s.PrimaryKey = buffer.String()
 		}
 	}
 
+	return nil
 }
 
 type TmplTableModelSchema struct {
@@ -378,14 +475,7 @@ type TmplTableModelSchema struct {
 }
 
 func (s *App) Model() error {
-	if s.cfg.UsingWire {
-		// model.go
-		if err := s.MakeTmplWire("model", "Schema", "\n\tNewSchemaAll, // schema all"); err != nil {
-			return err
-		}
-	}
-
-	tables := s.AllTable(false)
+	tables := s.getAllTable(false)
 
 	// model_schema.go
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
@@ -430,13 +520,15 @@ func (s *App) Model() error {
 		}
 		// table
 		modelSchemaContentBuffer := bytes.NewBuffer(nil)
-		tmp := table.TmplTableModel()
-		tmp.Make()
-		if err := tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
+		tmp, err := table.newTmplTableModel()
+		if err != nil {
+			return err
+		}
+		if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
 			return err
 		}
 		modelSchemaContentFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
-		if err := s.WriteFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
+		if err = s.writeFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
 
@@ -468,7 +560,7 @@ func (s *App) Model() error {
 		if err := tmpModelSchema.Execute(modelSchemaBuffer, schema); err != nil {
 			return err
 		}
-		if err := s.WriteFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
+		if err := s.writeFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
 			return err
 		}
 	}
@@ -480,7 +572,7 @@ func (s *App) Model() error {
 		}
 
 		// if _, err := os.Stat(modelSchemaCustomFilename); err != nil {
-		if err := s.WriteFile(modelSchemaCustomBuffer, modelSchemaCustomFilename); err != nil {
+		if err := s.writeFile(modelSchemaCustomBuffer, modelSchemaCustomFilename); err != nil {
 			return err
 		}
 		// }
@@ -488,10 +580,140 @@ func (s *App) Model() error {
 
 	// table_create.sql
 	{
-		if err := s.WriteFile(modelTableCreateBuffer, modelTableCreateFilename); err != nil {
+		if err := s.writeFile(modelTableCreateBuffer, modelTableCreateFilename); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func NewTemplate(name string, content []byte) *template.Template {
+	return template.Must(template.New(name).Delims(templateLeft, templateRight).Parse(*(*string)(unsafe.Pointer(&content))))
+}
+
+func pathJoin(items ...string) string {
+	return filepath.Join(items...)
+}
+
+// SchemaTable 数据库表结构
+type SchemaTable struct {
+	app              *App            `db:"-"`
+	TableSchema      *string         `db:"table_schema"`  // 数据库名
+	TableName        *string         `db:"table_name"`    // 表名
+	TableComment     *string         `db:"table_comment"` // 表注释
+	TableFieldSerial string          `db:"-"`             // 表自动递增字段
+	Column           []*SchemaColumn `db:"-"`             // 表中的所有字段
+	DDL              string          `db:"-"`             // 表定义语句
+}
+
+func (s *SchemaTable) pascal() string {
+	return utils.Pascal(*s.TableName)
+}
+
+func (s *SchemaTable) pascalFirstLower() string {
+	return utils.PascalFirstLower(*s.TableName)
+}
+
+func (s *SchemaTable) comment() string {
+	if s.TableComment == nil {
+		return ""
+	}
+	return *s.TableComment
+}
+
+func (s *SchemaTable) newTmplTableModel() (*TmplTableModel, error) {
+	tmp := &TmplTableModel{
+		table:                s,
+		Version:              s.app.Version,
+		OriginName:           *s.TableName,
+		OriginNamePascal:     s.pascal(),
+		OriginNameWithPrefix: *s.TableName,
+		OriginNameCamel:      s.pascalFirstLower(),
+		Comment:              *s.TableName,
+	}
+	if s.app.cfg.UsingTableSchemaName && s.app.cfg.TableSchemaName != "" {
+		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.cfg.TableSchemaName, *s.TableName)
+	}
+	if s.TableComment != nil && *s.TableComment != "" {
+		tmp.Comment = *s.TableComment
+	}
+	if err := tmp.prepare(); err != nil {
+		return nil, err
+	}
+	return tmp, nil
+}
+
+// SchemaColumn 表字段结构
+type SchemaColumn struct {
+	table                  *SchemaTable `db:"-"`
+	TableSchema            *string      `db:"table_schema"`             // 数据库名
+	TableName              *string      `db:"table_name"`               // 表名
+	ColumnName             *string      `db:"column_name"`              // 列名
+	OrdinalPosition        *int         `db:"ordinal_position"`         // 列序号
+	ColumnDefault          *string      `db:"column_default"`           // 列默认值
+	IsNullable             *string      `db:"is_nullable"`              // 是否允许列值为null
+	DataType               *string      `db:"data_type"`                // 列数据类型
+	CharacterMaximumLength *int         `db:"character_maximum_length"` // 字符串最大长度
+	CharacterOctetLength   *int         `db:"character_octet_length"`   // 文本字符串字节最大长度
+	NumericPrecision       *int         `db:"numeric_precision"`        // 整数最长长度|小数(整数+小数)合计长度
+	NumericScale           *int         `db:"numeric_scale"`            // 小数精度长度
+	CharacterSetName       *string      `db:"character_set_name"`       // 字符集名称
+	CollationName          *string      `db:"collation_name"`           // 校对集名称
+	ColumnComment          *string      `db:"column_comment"`           // 列注释
+	ColumnType             *string      `db:"column_type"`              // 列类型
+	ColumnKey              *string      `db:"column_key"`               // 列索引 '', 'PRI', 'UNI', 'MUL'
+	Extra                  *string      `db:"extra"`                    // 列额外属性 auto_increment
+}
+
+func (s *SchemaColumn) databaseTypeToGoType() (types string) {
+	nullable := true
+	if s.IsNullable != nil && strings.ToLower(*s.IsNullable) == "no" {
+		nullable = false
+	}
+	datatype := ""
+	if s.DataType != nil {
+		datatype = strings.ToLower(*s.DataType)
+	}
+	switch datatype {
+	case "tinyint":
+		types = "int8"
+	case "smallint", "smallserial":
+		types = "int16"
+	case "integer", "serial", "int":
+		types = "int"
+	case "bigint", "bigserial":
+		types = "int64"
+	case "decimal", "numeric", "real", "double precision", "double", "float":
+		types = "float64"
+	case "char", "character", "character varying", "text", "varchar", "enum", "mediumtext", "longtext":
+		types = "string"
+	case "bool", "boolean":
+		types = "bool"
+	default:
+		types = "string"
+	}
+	if nullable {
+		types = "*" + types
+	}
+	return
+}
+
+func (s *SchemaColumn) pascal() string {
+	return utils.Pascal(*s.ColumnName)
+}
+
+func (s *SchemaColumn) pascalFirstLower() string {
+	return utils.PascalFirstLower(*s.ColumnName)
+}
+
+func (s *SchemaColumn) upper() string {
+	return utils.Upper(*s.ColumnName)
+}
+
+func (s *SchemaColumn) comment() string {
+	if s.ColumnComment == nil {
+		return ""
+	}
+	return *s.ColumnComment
 }
