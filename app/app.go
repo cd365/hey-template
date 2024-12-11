@@ -477,8 +477,6 @@ func (s *TmplTableModel) prepare() error {
 type TmplTableModelSchema struct {
 	Version string // 模板版本
 
-	PrefixPackage string // 包导入前缀
-
 	// data
 	MapListDefine  string // data_schema.go tables define
 	MapListAssign  string // data_schema.go tables assign
@@ -549,8 +547,7 @@ func (s *App) Model() error {
 	// model_schema.go
 	{
 		schema := &TmplTableModelSchema{
-			Version:       s.Version,
-			PrefixPackage: s.cfg.ImportPrefixPackageName,
+			Version: s.Version,
 		}
 		length := len(tables)
 		defines := make([]string, 0, length)

@@ -26,8 +26,7 @@ type Config struct {
 	ColumnUpdatedAt string `json:"column_updated_at" yaml:"column_updated_at"` // 表数据更新时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnDeletedAt string `json:"column_deleted_at" yaml:"column_deleted_at"` // 表数据伪删除时间标记字段 通常是int或者int64类型 多个使用','隔开
 
-	ImportPrefixPackageName string `json:"import_prefix_package_name" yaml:"import_prefix_package_name"` // 导入包名前缀 默认main
-	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"`   // 模板文件输出路径
+	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"` // 模板文件输出路径
 
 	DisableTableNameMatchRules []string         `json:"disable_table_name_match_rules" yaml:"disable_table_name_match_rules"` // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
 	disableTableNameMatchRules []*regexp.Regexp // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
@@ -100,7 +99,6 @@ func InitConfig(configFile string) error {
 		Driver:                  "postgres",
 		DataSourceName:          "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
 		TableSchemaName:         "public",
-		ImportPrefixPackageName: "main",
 		UsingTableSchemaName:    true,
 		ColumnSerial:            "id",
 		ColumnCreatedAt:         "created_at,add_at",

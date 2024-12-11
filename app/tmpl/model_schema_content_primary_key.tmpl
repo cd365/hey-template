@@ -208,6 +208,26 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOne(primaryKey in
 	return s.SelectOne(s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available()), custom, ways...)
 }
 
+// PrimaryKeySelectOneAsc Query a piece of data based on the primary key value. Additional conditions can be added in the filter. ORDER BY PrimaryKey ASC
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOneAsc(primaryKey interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectOne(primaryKey, func(get *hey.Get) {
+		if custom != nil {
+			custom(get)
+		}
+		get.Asc(s.{{{.PrimaryKeyUpper}}})
+	}, filter, ways...)
+}
+
+// PrimaryKeySelectOneDesc Query a piece of data based on the primary key value. Additional conditions can be added in the filter. ORDER BY PrimaryKey DESC
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOneDesc(primaryKey interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectOne(primaryKey, func(get *hey.Get) {
+		if custom != nil {
+			custom(get)
+		}
+		get.Desc(s.{{{.PrimaryKeyUpper}}})
+	}, filter, ways...)
+}
+
 // PrimaryKeySelectExists Check whether the data exists based on the primary key value. Additional conditions can be added in the filter.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey interface{}, filter hey.Filter, ways ...*hey.Way) (bool, error) {
 	if primaryKey == nil {
@@ -260,6 +280,16 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetAll(primaryKeys inte
 // PrimaryKeyGetOne Query a piece of data based on the primary key value.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetOne(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
 	return s.PrimaryKeySelectOne(primaryKey, nil, nil, ways...)
+}
+
+// PrimaryKeyGetOneAsc Query a piece of data based on the primary key value. ORDER BY PrimaryKey ASC
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetOneAsc(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectOneAsc(primaryKey, nil, nil, ways...)
+}
+
+// PrimaryKeyGetOneDesc Query a piece of data based on the primary key value. ORDER BY PrimaryKey DESC
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetOneDesc(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+	return s.PrimaryKeySelectOneDesc(primaryKey, nil, nil, ways...)
 }
 
 // PrimaryKeyGetAllMap Make map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
