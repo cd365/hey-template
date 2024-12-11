@@ -5,12 +5,16 @@ import (
 	"gopkg.in/yaml.v3"
 	"os"
 	"regexp"
+	"root/utils"
+	"strings"
 )
 
 type Config struct {
 	Version  string `json:"version" yaml:"version"`     // 构建版本
 	BuildAt  string `json:"build_at" yaml:"build_at"`   // 构建时间
 	CommitId string `json:"commit_id" yaml:"commit_id"` // GIT提交HASH值
+
+	SchemaId string `json:"schema_id" yaml:"schema_id"` // 模板代码中的schema unique value
 
 	Driver         string `json:"driver" yaml:"driver"`                     // 数据库驱动名称 mysql|postgres
 	DataSourceName string `json:"data_source_name" yaml:"data_source_name"` // 数据源地址 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
@@ -74,6 +78,17 @@ func (s *Config) Disable(table string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Config) SchemaValue() string {
+	prefix := "Schema"
+	if s.SchemaId != "" {
+		if strings.HasPrefix(s.SchemaId, prefix) {
+			return s.SchemaId
+		}
+		return fmt.Sprintf("%s%s", prefix, s.SchemaId)
+	}
+	return fmt.Sprintf("%s%s", prefix, utils.RandomString(9))
 }
 
 // InitConfig 初始化默认配置

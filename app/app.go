@@ -37,6 +37,8 @@ type Helper interface {
 type App struct {
 	Version string
 
+	schema string
+
 	cfg *Config
 
 	way *hey.Way // 数据库连接对象
@@ -57,6 +59,7 @@ func NewApp(
 
 func (s *App) initial() error {
 	cfg := s.cfg
+	s.schema = cfg.SchemaValue()
 	cfg.Driver = strings.TrimSpace(cfg.Driver)
 	way, err := hey.NewWay(cfg.Driver, cfg.DataSourceName)
 	if err != nil {
@@ -94,6 +97,10 @@ func (s *App) initial() error {
 		return fmt.Errorf("unsupported driver name: %s", cfg.Driver)
 	}
 	return nil
+}
+
+func (s *App) getSchema() string {
+	return s.schema
 }
 
 func (s *App) writeFile(reader io.Reader, filename string) error {
@@ -156,6 +163,8 @@ type TableColumnPrimaryKey struct {
 	PrimaryKeySmallPascal string // 主键名(驼峰命名)
 	PrimaryKeyUpper       string // 主键名(全大写) 如: ACCOUNT_USERNAME
 	PrimaryKeyType        string // 主键在go语言里面的类型(int | int64 | string), 其它类型无效
+
+	Schema string // schema value
 }
 
 type TmplTableModel struct {
@@ -168,6 +177,8 @@ type TmplTableModel struct {
 	OriginNameWithPrefix string // 原始表名称
 	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
 	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
+
+	Schema string // schema value
 
 	// model
 	StructColumn                      []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
@@ -445,6 +456,7 @@ func (s *TmplTableModel) prepare() error {
 			PrimaryKeyPascal:      utils.Pascal(s.table.TableFieldSerial),
 			PrimaryKeySmallPascal: utils.PascalFirstLower(s.table.TableFieldSerial),
 			PrimaryKeyUpper:       strings.ToUpper(s.table.TableFieldSerial),
+			Schema:                s.table.app.getSchema(),
 		}
 		for _, c := range s.table.Column {
 			if s.table.TableFieldSerial == *c.ColumnName {
@@ -545,11 +557,11 @@ func (s *App) Model() error {
 		assigns := make([]string, 0, length)
 		storage := make([]string, 0, length)
 		slice := make([]string, 0, length)
-		schemaName := "SCHEMA"
+		schemaValue := s.getSchema()
 		for _, table := range tables {
 			namePascal := table.pascal()
-			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaName, namePascal))
-			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(way),", namePascal, schemaName, namePascal))
+			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaValue, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(way),", namePascal, schemaValue, namePascal))
 			storage = append(storage, fmt.Sprintf("tmp.%s.Table(): tmp.%s,", namePascal, namePascal))
 			slice = append(slice, fmt.Sprintf("tmp.%s.Table(),", namePascal))
 		}
@@ -631,6 +643,7 @@ func (s *SchemaTable) newTmplTableModel() (*TmplTableModel, error) {
 		OriginNameWithPrefix: *s.TableName,
 		OriginNameCamel:      s.pascalFirstLower(),
 		Comment:              *s.TableName,
+		Schema:               s.app.getSchema(),
 	}
 	if s.app.cfg.UsingTableSchemaName && s.app.cfg.TableSchemaName != "" {
 		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.cfg.TableSchemaName, *s.TableName)

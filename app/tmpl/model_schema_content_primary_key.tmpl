@@ -1,6 +1,6 @@
 
 // PrimaryKeyUpdate Update based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
     if primaryKey == nil {
         return 0, nil
     }
@@ -15,7 +15,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey PrimaryKey, 
 }
 
 // PrimaryKeyHidden Hidden based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
     if primaryKey == nil {
         return 0, nil
     }
@@ -39,7 +39,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey PrimaryKey, 
 }
 
 // PrimaryKeyDelete Delete based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
     if primaryKey == nil {
         return 0, nil
     }
@@ -53,7 +53,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey PrimaryKey, 
 }
 
 // PrimaryKeyUpsert Upsert based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if primaryKey == nil {
 		return 0, nil
 	}
@@ -65,7 +65,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey PrimaryKey, 
 }
 
 // PrimaryKeyUpdateAll Batch update based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
 		for _, tmp := range pks {
@@ -84,7 +84,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way, pks ..
 }
 
 // PrimaryKeyHiddenAll Batch hidden based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
 		for _, tmp := range pks {
@@ -103,7 +103,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way, pks ..
 }
 
 // PrimaryKeyDeleteAll Batch delete based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
 		for _, tmp := range pks {
@@ -122,7 +122,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(way *hey.Way, pks ..
 }
 
 // PrimaryKeyUpsertAll Batch upsert based on primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
 	var err error
     var num int64
@@ -152,17 +152,17 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way, pks ..
 }
 
 // PrimaryKeyEqual Build Filter PrimaryKey = value
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyEqual(value interface{}) hey.Filter {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyEqual(value interface{}) hey.Filter {
 	return hey.F().Equal(s.{{{.PrimaryKeyUpper}}}, value)
 }
 
 // PrimaryKeyIn Build Filter PrimaryKey IN ( values... )
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyIn(values ...interface{}) hey.Filter {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyIn(values ...interface{}) hey.Filter {
 	return hey.F().In(s.{{{.PrimaryKeyUpper}}}, values...)
 }
 
 // PrimaryKeyUpdateMap Update a row of data using map[string]interface{} by primary key value. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateMap(primaryKey interface{}, modify map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdateMap(primaryKey interface{}, modify map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if primaryKey == nil || len(modify) == 0 {
 		return 0, nil
 	}
@@ -173,7 +173,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpdateMap(primaryKey interface
 }
 
 // PrimaryKeyUpsertMap Upsert a row of data using map[string]interface{} by primary key value. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface{}, upsert map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface{}, upsert map[string]interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if len(upsert) == 0 {
 		return 0, nil
 	}
@@ -194,22 +194,22 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyUpsertMap(primaryKey interface
 }
 
 // PrimaryKeyDeleteFilter Delete one or more records based on the primary key values. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyDeleteFilter(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyDeleteFilter(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	return s.Delete(s.PrimaryKeyIn(primaryKeys).Use(filter), ways...)
 }
 
 // PrimaryKeySelectAll Query multiple records based on primary key values. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAll(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectAll(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
 	return s.SelectAll(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), custom, ways...)
 }
 
 // PrimaryKeySelectOne Query a piece of data based on the primary key value. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectOne(primaryKey interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOne(primaryKey interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
 	return s.SelectOne(s.PrimaryKeyEqual(primaryKey).Use(filter, s.Available()), custom, ways...)
 }
 
 // PrimaryKeySelectExists Check whether the data exists based on the primary key value. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey interface{}, filter hey.Filter, ways ...*hey.Way) (bool, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey interface{}, filter hey.Filter, ways ...*hey.Way) (bool, error) {
 	if primaryKey == nil {
 		return false, nil
 	}
@@ -221,7 +221,7 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey interf
 }
 
 // PrimaryKeySelectCount The number of statistics based on primary key values. Additional conditions can be added in the filter.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectCount(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectCount(primaryKeys interface{}, filter hey.Filter, ways ...*hey.Way) (int64, error) {
 	if primaryKeys == nil {
 		return 0, nil
 	}
@@ -232,42 +232,42 @@ func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectCount(primaryKeys interf
 {{{ if ne .PrimaryKeyType "" }}}
     {{{ if eq .PrimaryKeyType "string" }}}
 // PrimaryKeySelectAllMap Make map[string]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
     return s.SelectAllMap(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 
     {{{ if eq .PrimaryKeyType "int" }}}
 // PrimaryKeySelectAllMap Make map[int]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	return s.SelectAllMapInt(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 
     {{{ if eq .PrimaryKeyType "int64" }}}
 // PrimaryKeySelectAllMap Make map[int64]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectAllMap(primaryKeys interface{}, custom func(get *hey.Get), filter hey.Filter, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
     return s.SelectAllMapInt64(s.PrimaryKeyIn(primaryKeys).Use(filter, s.Available()), func(v *{{{.OriginNamePascal}}}) {{{.PrimaryKeyType}}} { return v.{{{.PrimaryKeyPascal}}} }, custom, ways...)
 }
     {{{ end }}}
 {{{ end }}}
 
 // PrimaryKeyGetAll Query multiple records based on primary key values.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetAll(primaryKeys interface{}, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetAll(primaryKeys interface{}, ways ...*hey.Way) ([]*{{{.OriginNamePascal}}}, error) {
 	return s.PrimaryKeySelectAll(primaryKeys, nil, nil, ways...)
 }
 
 // PrimaryKeyGetOne Query a piece of data based on the primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetOne(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetOne(primaryKey interface{}, ways ...*hey.Way) (*{{{.OriginNamePascal}}}, error) {
 	return s.PrimaryKeySelectOne(primaryKey, nil, nil, ways...)
 }
 
 // PrimaryKeyGetAllMap Make map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}} and []*{{{.OriginNamePascal}}}
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyGetAllMap(primaryKeys interface{}, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyGetAllMap(primaryKeys interface{}, ways ...*hey.Way) (map[{{{.PrimaryKeyType}}}]*{{{.OriginNamePascal}}}, []*{{{.OriginNamePascal}}}, error) {
 	return s.PrimaryKeySelectAllMap(primaryKeys, nil, nil, ways...)
 }
 
 // PrimaryKeyExists Check whether the data exists based on the primary key value.
-func (s *SCHEMA{{{.OriginNamePascal}}}) PrimaryKeyExists(primaryKey interface{}, ways ...*hey.Way) (bool, error) {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyExists(primaryKey interface{}, ways ...*hey.Way) (bool, error) {
 	return s.PrimaryKeySelectExists(primaryKey, nil, ways...)
 }
