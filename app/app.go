@@ -417,7 +417,7 @@ func (s *TmplTableModel) prepare() error {
 			}
 			tablePascal := s.table.pascal()
 			columnPascal := c.pascal()
-			s.StructColumnPrimaryKey = fmt.Sprintf("type PRIMARYKEY%s struct {\n\t%s *%s `json:\"%s\" db:\"-\" validate:\"omitempty,min=1\"`%s\n}\n\nfunc (s PRIMARYKEY%s) PrimaryKey() interface{} {\n\t if s.%s != nil {\n\treturn *s.%s\n\t}\n\treturn nil\n}",
+			s.StructColumnPrimaryKey = fmt.Sprintf("type PRIMARY0KEY%s struct {\n\t%s *%s `json:\"%s\" db:\"-\" validate:\"omitempty,min=1\"`%s\n}\n\nfunc (s PRIMARY0KEY%s) PrimaryKey() interface{} {\n\t if s.%s != nil {\n\treturn *s.%s\n\t}\n\treturn nil\n}",
 				tablePascal,
 				columnPascal,
 				c.databaseTypeToGoType(),
@@ -428,7 +428,7 @@ func (s *TmplTableModel) prepare() error {
 				columnPascal,
 			)
 			// append Primary-Key define
-			s.StructColumnMod = append(s.StructColumnMod, fmt.Sprintf("\tPRIMARYKEY%s\n", tablePascal))
+			s.StructColumnMod = append(s.StructColumnMod, fmt.Sprintf("\tPRIMARY0KEY%s\n", tablePascal))
 			continue
 		}
 
