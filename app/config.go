@@ -6,7 +6,6 @@ import (
 	"os"
 	"regexp"
 	"root/utils"
-	"strings"
 )
 
 type Config struct {
@@ -81,14 +80,10 @@ func (s *Config) Disable(table string) bool {
 }
 
 func (s *Config) SchemaValue() string {
-	prefix := "Schema"
 	if s.SchemaId != "" {
-		if strings.HasPrefix(s.SchemaId, prefix) {
-			return s.SchemaId
-		}
-		return fmt.Sprintf("%s%s", prefix, s.SchemaId)
+		return s.SchemaId
 	}
-	return fmt.Sprintf("%s%s", prefix, utils.RandomString(9))
+	return fmt.Sprintf("Schema%s", utils.RandomString(9))
 }
 
 // InitConfig 初始化默认配置
