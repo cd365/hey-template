@@ -61,6 +61,28 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ColumnExist(column string) bool {
 	return exist
 }
 
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ColumnValue(columnValue ...interface{}) map[string]interface{} {
+	length := len(columnValue)
+	if length == 0 || length&1 == 1 {
+		return nil
+	}
+	result := make(map[string]interface{}, length)
+	for i := 0; i < length; i += 2 {
+	    if i >= length || i+1 >= length {
+            continue
+        }
+		column, ok := columnValue[i].(string)
+		if !ok {
+			continue
+		}
+		if ok = s.ColumnExist(column); !ok {
+			continue
+		}
+		result[column] = columnValue[i+1]
+	}
+	return result
+}
+
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ColumnAutoIncr() []string {
 	return {{{.ColumnAutoIncr}}}
 }

@@ -59,6 +59,7 @@ type Table interface {
     ColumnMap() map[string]*struct{}
     ColumnString() string
     ColumnExist(column string) bool
+    ColumnValue(columnValue ...interface{}) map[string]interface{}
     ColumnAutoIncr() []string
     ColumnCreatedAt() []string
     ColumnUpdatedAt() []string
