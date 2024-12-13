@@ -23,7 +23,7 @@ func Start() {
 	flag.Parse()
 
 	if printVersion {
-		fmt.Println(values.Version)
+		fmt.Println(values.Version, values.CommitId, values.BuildAt)
 		return
 	}
 
@@ -59,13 +59,6 @@ func Start() {
 	}
 
 	{
-		if cfg.BuildAt != "" {
-			sss.Version = fmt.Sprintf("%s %s", sss.Version, cfg.BuildAt)
-		} else {
-			if values.BuildAt != "" {
-				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.BuildAt)
-			}
-		}
 		if cfg.CommitId != "" {
 			sss.Version = fmt.Sprintf("%s %s", sss.Version, cfg.CommitId)
 		} else {
@@ -73,6 +66,14 @@ func Start() {
 				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.CommitId)
 			}
 		}
+		if cfg.BuildAt != "" {
+			sss.Version = fmt.Sprintf("%s %s", sss.Version, cfg.BuildAt)
+		} else {
+			if values.BuildAt != "" {
+				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.BuildAt)
+			}
+		}
+
 	}
 
 	if err = sss.BuildAll(); err != nil {
