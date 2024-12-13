@@ -18,7 +18,13 @@ type {{{.Schema}}}{{{.OriginNamePascal}}} struct {
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
     columnMap map[string]*struct{}
     columnSlice []string
+
+    basic *Basic
     way *hey.Way
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Basic() *Basic {
+	return s.basic
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Table() string {
@@ -145,7 +151,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Insert(create interface{}, ways .
     if create == nil {
         return 0, nil
     }
-	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	ctx, cancel := context.WithTimeout(s.basic.ctx, s.basic.sqlExecuteMaxDuration)
 	defer cancel()
 	return s.Add(ways...).
 		Context(ctx).
@@ -164,7 +170,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Delete(where hey.Filter, ways ...
 	if where.IsEmpty() {
 		return 0, nil
 	}
-	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	ctx, cancel := context.WithTimeout(s.basic.ctx, s.basic.sqlExecuteMaxDuration)
 	defer cancel()
 	return s.Del(ways...).
 		Context(ctx).
@@ -188,7 +194,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Update(update func(f hey.Filter, 
             o.Set(v, timestamp)
         }
     })
-	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	ctx, cancel := context.WithTimeout(s.basic.ctx, s.basic.sqlExecuteMaxDuration)
 	defer cancel()
 	return modify.Context(ctx).Where(filter.Use(s.Available())).Mod()
 }
@@ -198,7 +204,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) InsertOne(create interface{}, way
     if create == nil {
 		return 0, nil
 	}
-	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	ctx, cancel := context.WithTimeout(s.basic.ctx, s.basic.sqlExecuteMaxDuration)
     defer cancel()
     return s.Add(ways...).Context(ctx).
         Default(func(o *hey.Add) {
@@ -214,7 +220,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) InsertSelect(columns []string, ge
     if len(columns) == 0 || get == nil {
 		return 0, nil
 	}
-	ctx, cancel := context.WithTimeout(Context, DoSqlTimeout)
+	ctx, cancel := context.WithTimeout(s.basic.ctx, s.basic.sqlExecuteMaxDuration)
 	defer cancel()
 	return s.Add(ways...).Context(ctx).ValuesSubQueryGet(get, columns...).Add()
 }
@@ -430,12 +436,13 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) SelectGetByColumn(column string, 
 	}, receive)
 }
 
-func New{{{.Schema}}}{{{.OriginNamePascal}}}(way *hey.Way) *{{{.Schema}}}{{{.OriginNamePascal}}} {
+func new{{{.Schema}}}{{{.OriginNamePascal}}}(basic Basic, way *hey.Way) *{{{.Schema}}}{{{.OriginNamePascal}}} {
 	s := &{{{.Schema}}}{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
 	}
 	s.columnMap = {{{.StructColumnSchemaValuesAccessMap}}}
 	s.columnSlice = {{{.StructColumnSchemaValuesAccess}}}
+	s.basic = &basic
 	s.way = way
 	return s
 }

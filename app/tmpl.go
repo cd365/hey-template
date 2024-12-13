@@ -8,9 +8,6 @@ var (
 	//go:embed tmpl/model_schema.tmpl
 	tmplModelSchema []byte
 
-	//go:embed tmpl/model_schema_custom.tmpl
-	tmplModelSchemaCustom []byte
-
 	//go:embed tmpl/model_schema_content.tmpl
 	tmplModelSchemaContent []byte
 

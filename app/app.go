@@ -478,10 +478,10 @@ type TmplTableModelSchema struct {
 	Version string // 模板版本
 
 	// data
-	MapListDefine  string // data_schema.go tables define
-	MapListAssign  string // data_schema.go tables assign
-	MapListStorage string // data_schema.go tables storage
-	MapListSlice   string // data_schema.go tables slice
+	DatabaseAttributeDefine         string // data_schema.go tables define
+	NewDatabaseAttributeAssign      string // data_schema.go tables assign
+	NewDatabaseAttributeAssignMap   string // data_schema.go tables storage
+	NewDatabaseAttributeAssignSlice string // data_schema.go tables slice
 
 	Schema string // schema value
 }
@@ -491,12 +491,9 @@ func (s *App) Model() error {
 
 	// model_schema.go
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
-	tmpModelSchemaCustom := NewTemplate("tmpl_model_schema_custom", tmplModelSchemaCustom)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
 	modelSchemaFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "model_schema.go")
-	modelSchemaCustomFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "model_schema_custom.go")
 	modelSchemaBuffer := bytes.NewBuffer(nil)
-	modelSchemaCustomBuffer := bytes.NewBuffer(nil)
 	modelTableCreateFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "aaa_table_create.sql")
 	modelTableCreateBuffer := bytes.NewBuffer(nil)
 
@@ -561,33 +558,20 @@ func (s *App) Model() error {
 		for _, table := range tables {
 			namePascal := table.pascal()
 			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaValue, namePascal))
-			assigns = append(assigns, fmt.Sprintf("%s: New%s%s(way),", namePascal, schemaValue, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: new%s%s(basic, way),", namePascal, schemaValue, namePascal))
 			storage = append(storage, fmt.Sprintf("tmp.%s.Table(): tmp.%s,", namePascal, namePascal))
 			slice = append(slice, fmt.Sprintf("tmp.%s.Table(),", namePascal))
 		}
-		schema.MapListDefine = strings.Join(defines, "\n\t")
-		schema.MapListAssign = strings.Join(assigns, "\n\t\t")
-		schema.MapListStorage = strings.Join(storage, "\n\t\t")
-		schema.MapListSlice = strings.Join(slice, "\n\t\t")
+		schema.DatabaseAttributeDefine = strings.Join(defines, "\n\t")
+		schema.NewDatabaseAttributeAssign = strings.Join(assigns, "\n\t\t")
+		schema.NewDatabaseAttributeAssignMap = strings.Join(storage, "\n\t\t")
+		schema.NewDatabaseAttributeAssignSlice = strings.Join(slice, "\n\t\t")
 		if err := tmpModelSchema.Execute(modelSchemaBuffer, schema); err != nil {
 			return err
 		}
 		if err := s.writeFile(modelSchemaBuffer, modelSchemaFilename); err != nil {
 			return err
 		}
-	}
-
-	// model_schema_custom.go
-	{
-		if err := tmpModelSchemaCustom.Execute(modelSchemaCustomBuffer, s); err != nil {
-			return err
-		}
-
-		// if _, err := os.Stat(modelSchemaCustomFilename); err != nil {
-		if err := s.writeFile(modelSchemaCustomBuffer, modelSchemaCustomFilename); err != nil {
-			return err
-		}
-		// }
 	}
 
 	// table_create.sql

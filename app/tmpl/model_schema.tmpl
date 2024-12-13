@@ -4,8 +4,10 @@
 package model
 
 import (
+    "context"
     "database/sql"
 	"github.com/cd365/hey/v2"
+	"time"
 )
 
 // AutoSelectWay Get the last non-empty element.
@@ -53,6 +55,7 @@ type PrimaryKey interface {
 }
 
 type Table interface {
+    Basic() *Basic
     Table() string
     Comment() string
     Column(except ...string) []string
@@ -110,21 +113,41 @@ type Table interface {
     ValueSliceStructPtr(capacities ...int) interface{}
 }
 
+type Basic struct {
+	// ctx Execute sql default context.
+	ctx context.Context
+
+	// sqlExecuteMaxDuration Execute sql max duration.
+	sqlExecuteMaxDuration time.Duration
+}
+
+func (s *Basic) SetSqlExecuteMaxDuration(duration time.Duration) *Basic {
+	if duration > 0 {
+		s.sqlExecuteMaxDuration = duration
+	}
+	return s
+}
+
 type Database struct {
     schemaMap map[string]Table
     schemaSlice []string
-	{{{.MapListDefine}}}
+
+	{{{.DatabaseAttributeDefine}}}
 }
 
-func NewDatabase(way *hey.Way) *Database {
+func NewDatabase(ctx context.Context, way *hey.Way) *Database {
+    basic := Basic{
+        ctx:                ctx,
+        sqlExecuteMaxDuration: time.Minute,
+    }
 	tmp := &Database{
-		{{{.MapListAssign}}}
+		{{{.NewDatabaseAttributeAssign}}}
 	}
 	tmp.schemaMap = map[string]Table{
-        {{{.MapListStorage}}}
+        {{{.NewDatabaseAttributeAssignMap}}}
     }
     tmp.schemaSlice = []string{
-        {{{.MapListSlice}}}
+        {{{.NewDatabaseAttributeAssignSlice}}}
     }
     return tmp
 }
@@ -155,9 +178,9 @@ type Database{{{.Schema}}} struct {
 	db *Database
 }
 
-func NewDatabase{{{.Schema}}}(way *hey.Way) *Database{{{.Schema}}} {
+func NewDatabase{{{.Schema}}}(ctx context.Context, way *hey.Way) *Database{{{.Schema}}} {
 	return &Database{{{.Schema}}}{
-		db: NewDatabase(way),
+		db: NewDatabase(ctx, way),
 	}
 }
 
