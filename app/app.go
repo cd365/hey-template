@@ -482,6 +482,8 @@ type TmplTableModelSchema struct {
 	MapListAssign  string // data_schema.go tables assign
 	MapListStorage string // data_schema.go tables storage
 	MapListSlice   string // data_schema.go tables slice
+
+	Schema string // schema value
 }
 
 func (s *App) Model() error {
@@ -548,6 +550,7 @@ func (s *App) Model() error {
 	{
 		schema := &TmplTableModelSchema{
 			Version: s.Version,
+			Schema:  s.getSchema(),
 		}
 		length := len(tables)
 		defines := make([]string, 0, length)

@@ -149,3 +149,18 @@ func (s *Database) TableExists(table string) bool {
 	_, ok := s.schemaMap[table]
 	return ok
 }
+
+// Database{{{.Schema}}} When there are multiple data instances, and you are using wire (github.com/google/wire), use the current instance to avoid duplicate type names.
+type Database{{{.Schema}}} struct {
+	db *Database
+}
+
+func NewDatabase{{{.Schema}}}(way *hey.Way) *Database{{{.Schema}}} {
+	return &Database{{{.Schema}}}{
+		db: NewDatabase(way),
+	}
+}
+
+func (s *Database{{{.Schema}}}) Database() *Database {
+	return s.db
+}
