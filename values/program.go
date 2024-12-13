@@ -1,7 +1,7 @@
 package values
 
 const (
-	Version = "v0.6.3" // 程序版本号
+	Version = "v0.6.4" // 程序版本号
 )
 
 var (

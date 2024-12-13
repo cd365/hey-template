@@ -5,9 +5,6 @@ import (
 )
 
 var (
-	//go:embed tmpl/wire.tmpl
-	tmplWire []byte
-
 	//go:embed tmpl/model_schema.tmpl
 	tmplModelSchema []byte
 
