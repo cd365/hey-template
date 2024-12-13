@@ -11,7 +11,7 @@ import (
 type Config struct {
 	Version  string `json:"version" yaml:"version"`     // 构建版本
 	BuildAt  string `json:"build_at" yaml:"build_at"`   // 构建时间
-	CommitId string `json:"commit_id" yaml:"commit_id"` // GIT提交HASH值
+	CommitId string `json:"commit_id" yaml:"commit_id"` // 版本控制ID
 
 	SchemaId string `json:"schema_id" yaml:"schema_id"` // 模板代码中的schema unique value
 

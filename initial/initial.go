@@ -14,35 +14,44 @@ func Start() {
 	configFile := ""
 	printVersion := false
 
-	flag.StringVar(&configFile, "c", "config.yaml", "yaml format config file") // yaml config file
-	flag.BoolVar(&printVersion, "v", false, "view version")                    // view version
+	// yaml config file
+	flag.StringVar(&configFile, "c", "config.yaml", "yaml format config file")
+
+	// view version
+	flag.BoolVar(&printVersion, "v", false, "view version")
 
 	flag.Parse()
 
-	stat, err := os.Stat(configFile)
-	if err != nil {
-		if err = app.InitConfig(configFile); err != nil {
-			fmt.Println("配置文件不存在,创建失败")
-		}
-		fmt.Println("配置文件不存在,现已创建")
+	if printVersion {
+		fmt.Println(values.Version)
 		return
 	}
-	if stat.IsDir() {
-		fmt.Println("配置文件是一个目录")
-		return
+
+	{
+		stat, err := os.Stat(configFile)
+		if err != nil {
+			if err = app.InitConfig(configFile); err != nil {
+				fmt.Println("the configuration file does not exist, creation failed")
+			}
+			fmt.Println("the configuration file does not exist and has been created")
+			return
+		}
+		if stat.IsDir() {
+			fmt.Println("the configuration file is a directory")
+			return
+		}
 	}
 
 	cfg, err := app.ReadConfig(configFile)
 	if err != nil {
-		fmt.Println("解析配置文件失败", err.Error())
+		fmt.Println("failed to parse the configuration file", err.Error())
 		return
 	}
 	if err = cfg.Initial(); err != nil {
-		fmt.Println("配置文件初始化失败", err.Error())
+		fmt.Println("configuration file initialization failed", err.Error())
 		return
 	}
 
-	// 初始化
 	sss, err := inject(context.Background(), cfg)
 	if err != nil {
 		fmt.Println("initial failed.", err.Error())
@@ -64,11 +73,6 @@ func Start() {
 				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.CommitId)
 			}
 		}
-	}
-
-	if printVersion {
-		fmt.Println(sss.Version)
-		return
 	}
 
 	if err = sss.BuildAll(); err != nil {

@@ -1,4 +1,4 @@
-### Install the dependent program wire
+### INSTALL
 ```bash
-go install github.com/google/wire/cmd/wire@latest
+go install github.com/cd365/hey-template@latest
 ```

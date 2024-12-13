@@ -41,9 +41,9 @@ type App struct {
 
 	cfg *Config
 
-	way *hey.Way // 数据库连接对象
+	way *hey.Way
 
-	helper Helper // 数据接口
+	helper Helper
 }
 
 func NewApp(
