@@ -9,9 +9,8 @@ import (
 )
 
 type Config struct {
-	Version  string `json:"version" yaml:"version"`     // 构建版本
-	BuildAt  string `json:"build_at" yaml:"build_at"`   // 构建时间
-	CommitId string `json:"commit_id" yaml:"commit_id"` // 版本控制ID
+	BuildAt  string `json:"build_at,omitempty" yaml:"build_at,omitempty"`   // 构建时间
+	CommitId string `json:"commit_id,omitempty" yaml:"commit_id,omitempty"` // 版本控制ID
 
 	SchemaId string `json:"schema_id" yaml:"schema_id"` // 模板代码中的schema unique value
 
@@ -93,9 +92,7 @@ func InitConfig(configFile string) error {
 	}
 	defer func() { _ = fil.Close() }()
 	config := &Config{
-		Version:                 "v0.0.1",
-		BuildAt:                 "20200303080000",
-		CommitId:                "0000000000000000000000000000000000000000",
+		SchemaId:                "S000001",
 		Driver:                  "postgres",
 		DataSourceName:          "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
 		TableSchemaName:         "public",
@@ -107,7 +104,7 @@ func InitConfig(configFile string) error {
 		TemplateOutputDirectory: "",
 		DisableTableNameMatchRules: []string{
 			"^aaa_.*$",
-			"^zzz_.*$",
+			"^.*_zzz$",
 		},
 		DatabaseIdentify: "\"",
 	}
