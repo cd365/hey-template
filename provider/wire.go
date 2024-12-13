@@ -1,8 +1,8 @@
 package provider
 
 import (
+	"github.com/cd365/hey-template/app"
 	"github.com/google/wire"
-	"root/app"
 )
 
 var WireProviderSet = wire.NewSet(

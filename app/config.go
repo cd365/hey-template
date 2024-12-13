@@ -2,10 +2,10 @@ package app
 
 import (
 	"fmt"
+	"github.com/cd365/hey-template/utils"
 	"gopkg.in/yaml.v3"
 	"os"
 	"regexp"
-	"root/utils"
 )
 
 type Config struct {

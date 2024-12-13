@@ -1,7 +1,7 @@
 package main
 
 import (
-	"root/initial"
+	"github.com/cd365/hey-template/initial"
 )
 
 func main() {

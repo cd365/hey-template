@@ -1,4 +1,4 @@
-module root
+module github.com/cd365/hey-template
 
 go 1.18
 

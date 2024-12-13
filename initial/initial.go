@@ -4,9 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/cd365/hey-template/app"
+	"github.com/cd365/hey-template/values"
 	"os"
-	"root/app"
-	"root/values"
 )
 
 func Start() {

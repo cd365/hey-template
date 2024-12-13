@@ -8,7 +8,7 @@ package initial
 
 import (
 	"context"
-	"root/app"
+	"github.com/cd365/hey-template/app"
 )
 
 // Injectors from wire.go:

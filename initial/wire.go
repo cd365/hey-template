@@ -5,8 +5,8 @@ package initial
 
 import (
 	"context"
-	"root/app"
-	"root/provider"
+	"github.com/cd365/hey-template/app"
+	"github.com/cd365/hey-template/provider"
 
 	"github.com/google/wire"
 )
