@@ -14,7 +14,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey Prima
         return 0, nil
     }
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
+        f.Equal(s.PrimaryKey(), pk).Use(filter)
         u.Modify(primaryKey)
     }, ways...)
 }
@@ -38,7 +38,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyHidden(primaryKey Prima
 		return 0, nil
 	}
 	return s.Update(func(f hey.Filter, u *hey.Mod) {
-        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
+        f.Equal(s.PrimaryKey(), pk).Use(filter)
         u.Modify(updates)
     }, way)
 }
@@ -53,7 +53,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyDelete(primaryKey Prima
         return 0, nil
     }
 	return s.Delete(s.Filter(func(f hey.Filter) {
-        f.Equal(s.{{{.PrimaryKeyUpper}}}, pk).Use(filter)
+        f.Equal(s.PrimaryKey(), pk).Use(filter)
     }), ways...)
 }
 
@@ -158,12 +158,12 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way,
 
 // PrimaryKeyEqual Build Filter PrimaryKey = value
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyEqual(value interface{}) hey.Filter {
-	return hey.F().Equal(s.{{{.PrimaryKeyUpper}}}, value)
+	return hey.F().Equal(s.PrimaryKey(), value)
 }
 
 // PrimaryKeyIn Build Filter PrimaryKey IN ( values... )
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyIn(values ...interface{}) hey.Filter {
-	return hey.F().In(s.{{{.PrimaryKeyUpper}}}, values...)
+	return hey.F().In(s.PrimaryKey(), values...)
 }
 
 // PrimaryKeyUpdateMap Update a row of data using map[string]interface{} by primary key value. Additional conditions can be added in the filter.
@@ -219,7 +219,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOneAsc(primaryKey
 		if custom != nil {
 			custom(get)
 		}
-		get.Asc(s.{{{.PrimaryKeyUpper}}})
+		get.Asc(s.PrimaryKey())
 	}, filter, ways...)
 }
 
@@ -229,7 +229,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectOneDesc(primaryKe
 		if custom != nil {
 			custom(get)
 		}
-		get.Desc(s.{{{.PrimaryKeyUpper}}})
+		get.Desc(s.PrimaryKey())
 	}, filter, ways...)
 }
 
@@ -238,7 +238,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeySelectExists(primaryKey
 	if primaryKey == nil {
 		return false, nil
 	}
-	exists, err := s.PrimaryKeySelectOne(primaryKey, func(get *hey.Get) { get.Column(s.{{{.PrimaryKeyUpper}}}) }, filter, ways...)
+	exists, err := s.PrimaryKeySelectOne(primaryKey, func(get *hey.Get) { get.Column(s.PrimaryKey()) }, filter, ways...)
     if err != nil {
         return false, err
     }
