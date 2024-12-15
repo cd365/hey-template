@@ -52,28 +52,31 @@ func Start() {
 		return
 	}
 
+	{
+		cfg.Version = values.Version
+		if cfg.CommitId != "" {
+			cfg.Version = fmt.Sprintf("%s %s", cfg.Version, cfg.CommitId)
+		} else {
+			if values.CommitId != "" {
+				cfg.Version = fmt.Sprintf("%s %s", cfg.Version, values.CommitId)
+			}
+		}
+		if cfg.BuildAt != "" {
+			cfg.Version = fmt.Sprintf("%s %s", cfg.Version, cfg.BuildAt)
+		} else {
+			if values.BuildAt != "" {
+				cfg.Version = fmt.Sprintf("%s %s", cfg.Version, values.BuildAt)
+			}
+		}
+		if cfg.Schema == "" {
+			cfg.Schema = "S000001"
+		}
+	}
+
 	sss, err := inject(context.Background(), cfg)
 	if err != nil {
 		fmt.Println("initial failed.", err.Error())
 		return
-	}
-
-	{
-		if cfg.CommitId != "" {
-			sss.Version = fmt.Sprintf("%s %s", sss.Version, cfg.CommitId)
-		} else {
-			if values.CommitId != "" {
-				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.CommitId)
-			}
-		}
-		if cfg.BuildAt != "" {
-			sss.Version = fmt.Sprintf("%s %s", sss.Version, cfg.BuildAt)
-		} else {
-			if values.BuildAt != "" {
-				sss.Version = fmt.Sprintf("%s %s", sss.Version, values.BuildAt)
-			}
-		}
-
 	}
 
 	if err = sss.BuildAll(); err != nil {

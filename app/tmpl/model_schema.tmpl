@@ -90,6 +90,7 @@ type Table interface {
     SelectExistsByColumn(column string, values interface{}, customs ...func(f hey.Filter, g *hey.Get)) (bool, error)
     SelectGetByColumn(column string, values interface{}, receive interface{}, customs ...func(f hey.Filter, g *hey.Get)) error
 
+    PrimaryKey() string
     PrimaryKeyUpdate(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
     PrimaryKeyHidden(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)
     PrimaryKeyDelete(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error)

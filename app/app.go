@@ -37,8 +37,6 @@ type Helper interface {
 type App struct {
 	Version string
 
-	schema string
-
 	cfg *Config
 
 	way *hey.Way
@@ -59,7 +57,6 @@ func NewApp(
 
 func (s *App) initial() error {
 	cfg := s.cfg
-	s.schema = cfg.SchemaValue()
 	cfg.Driver = strings.TrimSpace(cfg.Driver)
 	way, err := hey.NewWay(cfg.Driver, cfg.DataSourceName)
 	if err != nil {
@@ -97,10 +94,6 @@ func (s *App) initial() error {
 		return fmt.Errorf("unsupported driver name: %s", cfg.Driver)
 	}
 	return nil
-}
-
-func (s *App) getSchema() string {
-	return s.schema
 }
 
 func (s *App) writeFile(reader io.Reader, filename string) error {
@@ -158,27 +151,24 @@ func (s *App) BuildAll() error {
 }
 
 type TableColumnPrimaryKey struct {
+	*Config
 	OriginNamePascal      string // 表名(帕斯卡命名)
 	PrimaryKeyPascal      string // 主键名(帕斯卡命名)
 	PrimaryKeySmallPascal string // 主键名(驼峰命名)
 	PrimaryKeyUpper       string // 主键名(全大写) 如: ACCOUNT_USERNAME
 	PrimaryKeyType        string // 主键在go语言里面的类型(int | int64 | string), 其它类型无效
-
-	Schema string // schema value
 }
 
 type TmplTableModel struct {
-	table *SchemaTable
+	*Config
 
-	Version string // 模板版本
+	table *SchemaTable
 
 	OriginName           string // 原始表名称
 	OriginNamePascal     string // 原始表名称(帕斯卡命名)
 	OriginNameWithPrefix string // 原始表名称
 	OriginNameCamel      string // 表名(帕斯卡命名)首字母小写表名
 	Comment              string // 表注释(如果表没有注释使用原始表名作为默认值)
-
-	Schema string // schema value
 
 	// model
 	StructColumn                      []string // 表结构体字段定义 ==> Name string `json:"name" db:"name"` // 名称
@@ -456,8 +446,8 @@ func (s *TmplTableModel) prepare() error {
 			PrimaryKeyPascal:      utils.Pascal(s.table.TableFieldSerial),
 			PrimaryKeySmallPascal: utils.PascalFirstLower(s.table.TableFieldSerial),
 			PrimaryKeyUpper:       strings.ToUpper(s.table.TableFieldSerial),
-			Schema:                s.table.app.getSchema(),
 		}
+		data.Config = s.table.app.cfg
 		for _, c := range s.table.Column {
 			if s.table.TableFieldSerial == *c.ColumnName {
 				data.PrimaryKeyType = strings.ToLower(c.databaseTypeToGoType())
@@ -475,15 +465,12 @@ func (s *TmplTableModel) prepare() error {
 }
 
 type TmplTableModelSchema struct {
-	Version string // 模板版本
-
+	*Config
 	// data
 	DatabaseAttributeDefine         string // data_schema.go tables define
 	NewDatabaseAttributeAssign      string // data_schema.go tables assign
 	NewDatabaseAttributeAssignMap   string // data_schema.go tables storage
 	NewDatabaseAttributeAssignSlice string // data_schema.go tables slice
-
-	Schema string // schema value
 }
 
 func (s *App) Model() error {
@@ -545,20 +532,17 @@ func (s *App) Model() error {
 
 	// model_schema.go
 	{
-		schema := &TmplTableModelSchema{
-			Version: s.Version,
-			Schema:  s.getSchema(),
-		}
+		schema := &TmplTableModelSchema{}
+		schema.Config = s.cfg
 		length := len(tables)
 		defines := make([]string, 0, length)
 		assigns := make([]string, 0, length)
 		storage := make([]string, 0, length)
 		slice := make([]string, 0, length)
-		schemaValue := s.getSchema()
 		for _, table := range tables {
 			namePascal := table.pascal()
-			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, schemaValue, namePascal))
-			assigns = append(assigns, fmt.Sprintf("%s: new%s%s(basic, way),", namePascal, schemaValue, namePascal))
+			defines = append(defines, fmt.Sprintf("%s *%s%s", namePascal, s.cfg.Schema, namePascal))
+			assigns = append(assigns, fmt.Sprintf("%s: new%s%s(basic, way),", namePascal, s.cfg.Schema, namePascal))
 			storage = append(storage, fmt.Sprintf("tmp.%s.Table(): tmp.%s,", namePascal, namePascal))
 			slice = append(slice, fmt.Sprintf("tmp.%s.Table(),", namePascal))
 		}
@@ -621,14 +605,13 @@ func (s *SchemaTable) comment() string {
 func (s *SchemaTable) newTmplTableModel() (*TmplTableModel, error) {
 	tmp := &TmplTableModel{
 		table:                s,
-		Version:              s.app.Version,
 		OriginName:           *s.TableName,
 		OriginNamePascal:     s.pascal(),
 		OriginNameWithPrefix: *s.TableName,
 		OriginNameCamel:      s.pascalFirstLower(),
 		Comment:              *s.TableName,
-		Schema:               s.app.getSchema(),
 	}
+	tmp.Config = s.app.cfg
 	if s.app.cfg.UsingTableSchemaName && s.app.cfg.TableSchemaName != "" {
 		tmp.OriginNameWithPrefix = fmt.Sprintf("%s.%s", s.app.cfg.TableSchemaName, *s.TableName)
 	}

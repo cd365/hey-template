@@ -2,17 +2,17 @@ package app
 
 import (
 	"fmt"
-	"github.com/cd365/hey-template/utils"
 	"gopkg.in/yaml.v3"
 	"os"
 	"regexp"
 )
 
 type Config struct {
+	Version  string `json:"-" yaml:"-"`                                     // 模板版本
 	BuildAt  string `json:"build_at,omitempty" yaml:"build_at,omitempty"`   // 构建时间
 	CommitId string `json:"commit_id,omitempty" yaml:"commit_id,omitempty"` // 版本控制ID
 
-	SchemaId string `json:"schema_id" yaml:"schema_id"` // 模板代码中的schema unique value
+	Schema string `json:"schema" yaml:"schema"` // 模板代码中的schema unique value
 
 	Driver         string `json:"driver" yaml:"driver"`                     // 数据库驱动名称 mysql|postgres
 	DataSourceName string `json:"data_source_name" yaml:"data_source_name"` // 数据源地址 mysql=>root:112233@tcp(127.0.0.1:3306)/hello?charset=utf8mb4&collation=utf8mb4_unicode_ci&timeout=90s pgsql=>postgres://postgres:112233@[::1]:5432/hello?sslmode=disable
@@ -77,13 +77,6 @@ func (s *Config) Disable(table string) bool {
 	return false
 }
 
-func (s *Config) SchemaValue() string {
-	if s.SchemaId != "" {
-		return s.SchemaId
-	}
-	return fmt.Sprintf("Schema%s", utils.RandomString(9))
-}
-
 // InitConfig 初始化默认配置
 func InitConfig(configFile string) error {
 	fil, err := os.OpenFile(configFile, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
@@ -92,7 +85,7 @@ func InitConfig(configFile string) error {
 	}
 	defer func() { _ = fil.Close() }()
 	config := &Config{
-		SchemaId:                "S000001",
+		Schema:                  "S000001",
 		Driver:                  "postgres",
 		DataSourceName:          "postgres://postgres:112233@[::1]:5432/hello?sslmode=disable",
 		TableSchemaName:         "public",

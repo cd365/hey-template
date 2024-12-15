@@ -1,4 +1,9 @@
 
+// PrimaryKey Table primary key column name.
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKey() string {
+	return s.{{{.PrimaryKeyUpper}}}
+}
+
 // PrimaryKeyUpdate Update based on the primary key as a condition. primaryKey can be any struct or struct pointer that implements the PrimaryKey interface. Additional conditions can be added in the filter.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdate(primaryKey PrimaryKey, filter hey.Filter, ways ...*hey.Way) (int64, error) {
     if primaryKey == nil {
