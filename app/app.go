@@ -477,7 +477,7 @@ func (s *App) Model() error {
 	tables := s.getAllTable(false)
 
 	pkg := s.cfg.Package
-	// model_schema.go
+
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
 	modelSchemaFilename := pathJoin(s.cfg.TemplateOutputDirectory, pkg, "aaa_schema.go")
@@ -525,13 +525,14 @@ func (s *App) Model() error {
 			return err
 		}
 		modelSchemaContentFilename := pathJoin(s.cfg.TemplateOutputDirectory, pkg, fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		// zzz_xxx_aaa.go
 		if err = s.writeFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
 
 	}
 
-	// model_schema.go
+	// aaa_schema.go
 	{
 		schema := &TmplTableModelSchema{}
 		schema.Config = s.cfg
