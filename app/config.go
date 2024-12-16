@@ -25,6 +25,7 @@ type Config struct {
 	ColumnUpdatedAt string `json:"column_updated_at" yaml:"column_updated_at"` // 表数据更新时间标记字段 通常是int或者int64类型 多个使用','隔开
 	ColumnDeletedAt string `json:"column_deleted_at" yaml:"column_deleted_at"` // 表数据伪删除时间标记字段 通常是int或者int64类型 多个使用','隔开
 
+	Package                 string `json:"package" yaml:"package"`                                     // 包名
 	TemplateOutputDirectory string `json:"template_output_directory" yaml:"template_output_directory"` // 模板文件输出路径
 
 	DisableTableNameMatchRules []string         `json:"disable_table_name_match_rules" yaml:"disable_table_name_match_rules"` // 禁止构建表的正则表达式 表名称只需要满足其中一条正则表达式即可 不配置即不限制
@@ -94,6 +95,7 @@ func InitConfig(configFile string) error {
 		ColumnCreatedAt:         "created_at,add_at",
 		ColumnUpdatedAt:         "updated_at,mod_at",
 		ColumnDeletedAt:         "deleted_at,del_at",
+		Package:                 "model",
 		TemplateOutputDirectory: "",
 		DisableTableNameMatchRules: []string{
 			"^aaa_.*$",

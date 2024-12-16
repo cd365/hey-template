@@ -476,12 +476,13 @@ type TmplTableModelSchema struct {
 func (s *App) Model() error {
 	tables := s.getAllTable(false)
 
+	pkg := s.cfg.Package
 	// model_schema.go
 	tmpModelSchema := NewTemplate("tmpl_model_schema", tmplModelSchema)
 	tmpModelSchemaContent := NewTemplate("tmpl_model_schema_content", tmplModelSchemaContent)
-	modelSchemaFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "model_schema.go")
+	modelSchemaFilename := pathJoin(s.cfg.TemplateOutputDirectory, pkg, "aaa_schema.go")
 	modelSchemaBuffer := bytes.NewBuffer(nil)
-	modelTableCreateFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", "aaa_table_create.sql")
+	modelTableCreateFilename := pathJoin(s.cfg.TemplateOutputDirectory, pkg, "aaa_table_create.sql")
 	modelTableCreateBuffer := bytes.NewBuffer(nil)
 
 	for index, table := range tables {
@@ -523,7 +524,7 @@ func (s *App) Model() error {
 		if err = tmpModelSchemaContent.Execute(modelSchemaContentBuffer, tmp); err != nil {
 			return err
 		}
-		modelSchemaContentFilename := pathJoin(s.cfg.TemplateOutputDirectory, "model", fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
+		modelSchemaContentFilename := pathJoin(s.cfg.TemplateOutputDirectory, pkg, fmt.Sprintf("%s%s%s%s", tableFilenamePrefix, *table.TableName, tableFilenameSuffix, tableFilenameGo))
 		if err = s.writeFile(modelSchemaContentBuffer, modelSchemaContentFilename); err != nil {
 			return err
 		}
