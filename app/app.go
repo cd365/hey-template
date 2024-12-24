@@ -672,11 +672,17 @@ func (s *SchemaColumn) databaseTypeToGoType() (types string) {
 		types = "string"
 	case "bool", "boolean":
 		types = "bool"
+	case "binary", "varbinary", "tinyblob", "mediumblob", "longblob", // mysql
+		"blob",  // mysql && sqlite
+		"bytea": // postgresql
+		types = "[]byte"
 	default:
 		types = "string"
 	}
 	if nullable {
-		types = "*" + types
+		if types != "[]byte" {
+			types = "*" + types
+		}
 	}
 	return
 }
