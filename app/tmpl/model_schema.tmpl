@@ -6,8 +6,12 @@ package {{{.Package}}}
 import (
     "context"
     "database/sql"
-	"github.com/cd365/hey/v2"
-	"time"
+    "fmt"
+    "github.com/cd365/hey/v2"
+    "regexp"
+    "strconv"
+    "strings"
+    "time"
 )
 
 // AutoSelectWay Get the last non-empty element.
@@ -18,35 +22,6 @@ func AutoSelectWay(way *hey.Way, ways ...*hey.Way) *hey.Way {
 		}
 	}
 	return way
-}
-
-// MapValues Get all the values of the map.
-func MapValues[T interface{}, U comparable](m map[U]T) []T {
-	slice := make([]T, 0, len(m))
-	for _, v := range m {
-		slice = append(slice, v)
-	}
-	return slice
-}
-
-// SliceToMap Slice to map.
-func SliceToMap[T interface{}, U comparable](slice []T, key func(tmp T) U) map[U]T {
-	length := len(slice)
-	m := make(map[U]T, length)
-	for i := 0; i < length; i++ {
-		m[key(slice[i])] = slice[i]
-	}
-	return m
-}
-
-// ColumnValueIn Build column IN ( ... )
-func ColumnValueIn[T any](column string, value func(tmp T) interface{}, slice []T) hey.Filter {
-	filter := hey.F()
-	inValues := make([]interface{}, 0, len(slice))
-	for _, tmp := range slice {
-		inValues = append(inValues, value(tmp))
-	}
-	return filter.In(column, inValues...)
 }
 
 // PrimaryKey Used to obtain the primary key column value of the database table.
@@ -187,4 +162,234 @@ func NewDatabase{{{.Schema}}}(ctx context.Context, way *hey.Way) *Database{{{.Sc
 
 func (s *Database{{{.Schema}}}) Database() *Database {
 	return s.db
+}
+
+/* common structures for querying data */
+
+// QueryIndexValueMaxMin MAX or MIN index value.
+type QueryIndexValueMaxMin struct {
+	IndexValueMax *int64 `json:"index_max" query:"index_max" form:"index_max" validate:"omitempty,min=0"` // maximum (index or serial) value
+	IndexValueMin *int64 `json:"index_min" query:"index_min" form:"index_min" validate:"omitempty,min=0"` // minimum (index or serial) value
+}
+
+func (s QueryIndexValueMaxMin) HasIndexValueMax() bool {
+	return s.IndexValueMax != nil && s.IndexValueMin == nil
+}
+
+func (s QueryIndexValueMaxMin) HasIndexValueMin() bool {
+	return s.IndexValueMin != nil && s.IndexValueMax == nil
+}
+
+// UseMaxOrMinValue column value type must be integer.
+func (s QueryIndexValueMaxMin) UseMaxOrMinValue(column string, filter hey.Filter) {
+	if (s.IndexValueMax != nil && s.IndexValueMin != nil) || column == "" || filter == nil {
+		return
+	}
+	if s.IndexValueMax != nil {
+		filter.LessThan(column, *s.IndexValueMax)
+		return
+	}
+	if s.IndexValueMin != nil {
+		filter.GreaterThan(column, *s.IndexValueMin)
+		return
+	}
+}
+
+func NewIndexValueMax(maxValue int64) *QueryIndexValueMaxMin {
+	return &QueryIndexValueMaxMin{IndexValueMax: &maxValue}
+}
+
+func NewIndexValueMin(minValue int64) *QueryIndexValueMaxMin {
+	return &QueryIndexValueMaxMin{IndexValueMin: &minValue}
+}
+
+var (
+	// regexpQueryTimeStartEnd column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
+	regexpQueryTimeStartEnd = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
+)
+
+type QueryTimeStartEnd string // time duration `min-value,max-value` example format: `1701234567,1701320967` OR `1701234567000,1701320967000` OR `2006-01-02,2006-01-03` OR `2006-01-02 15:04:05,2006-01-03 15:04:05`
+
+// UseTimeStartEnd column BETWEEN `start` AND `end`
+func (s QueryTimeStartEnd) UseTimeStartEnd(column string, filter hey.Filter) {
+	if column == "" || filter == nil {
+		return
+	}
+	if !regexpQueryTimeStartEnd.MatchString(string(s)) {
+		return
+	}
+	splits := strings.Split(string(s), ",")
+	if len(splits) != 2 {
+		return
+	}
+	between := make([]interface{}, 0, 2)
+	timestamp := 0
+	date := 0
+	datetime := 0
+	for _, tmp := range splits {
+		if i64, err := strconv.ParseInt(tmp, 10, 64); err == nil {
+			if i64 <= 0 {
+				return
+			}
+			length := len(tmp)
+			if length != 10 && length != 13 && length != 16 && length != 19 {
+				return
+			}
+			between = append(between, i64)
+			timestamp++
+			continue
+		}
+		if len(tmp) == 10 {
+			timeDate, err := time.Parse(time.DateOnly, tmp)
+			if err != nil {
+				return
+			}
+			between = append(between, timeDate)
+			date++
+			continue
+		}
+		timeDatetime, err := time.Parse(time.DateTime, tmp)
+		if err != nil {
+			return
+		}
+		between = append(between, timeDatetime)
+		datetime++
+	}
+	if timestamp == 2 {
+		if between[0].(int64) > between[1].(int64) {
+			return
+		}
+		filter.Between(column, between[0], between[1])
+		return
+	}
+	if date == 2 {
+		if between[0].(time.Time).Unix() > between[1].(time.Time).Unix() {
+			return
+		}
+		filter.Between(column, splits[0], splits[1])
+		return
+	}
+	if datetime == 2 {
+		if between[0].(time.Time).Unix() > between[1].(time.Time).Unix() {
+			return
+		}
+		filter.Between(column, splits[0], splits[1])
+		return
+	}
+}
+
+type QueryIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
+
+func (s QueryIn) UseInInt(column string, filter hey.Filter) {
+	if column == "" || filter == nil {
+		return
+	}
+	splits := strings.Split(strings.ReplaceAll(string(s), " ", ""), ",")
+	length := len(splits)
+	if length == 0 {
+		return
+	}
+	lists := make([]interface{}, 0, length)
+	for _, tmp := range splits {
+		if i64, err := strconv.ParseInt(tmp, 10, 64); err != nil {
+			return
+		} else {
+			lists = append(lists, i64)
+		}
+	}
+	filter.In(column, lists...)
+}
+
+func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) {
+	if column == "" || filter == nil {
+		return
+	}
+	splits := strings.Split(strings.TrimSpace(string(s)), ",")
+	length := len(splits)
+	if length == 0 {
+		return
+	}
+	var adjust func(item string) (string, error)
+	for i := len(adjusts) - 1; i >= 0; i-- {
+		if adjusts[i] != nil {
+			adjust = adjusts[i]
+			break
+		}
+	}
+	lists := make([]interface{}, 0, length)
+	for _, tmp := range splits {
+		if adjust != nil {
+			if item, err := adjust(tmp); err != nil {
+				return
+			} else {
+				tmp = item
+			}
+		}
+		lists = append(lists, tmp)
+	}
+	filter.In(column, lists...)
+}
+
+type QueryKeyword string // search keyword [1,32]
+
+func (s QueryKeyword) GetKeyword() string {
+	return fmt.Sprintf("%%%s%%", s)
+}
+
+func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) {
+	if s != "" && filter != nil {
+		filter.Like(column, s.GetKeyword())
+	}
+}
+
+type QueryLimitOffset struct {
+	Limit *int64 `json:"limit" query:"limit" form:"limit" validate:"omitempty,min=1,max=5000"` // page size [1,5000]
+
+	Offset *int64 `json:"offset" query:"offset" form:"offset" validate:"omitempty,min=0,max=100000"` // offset value [0,100000]
+
+	Page *int64 `json:"page" query:"page" form:"page" validate:"omitempty,min=1"` // page value [1,+∞]
+}
+
+func (s QueryLimitOffset) GetLimit() int64 {
+	if s.Limit == nil {
+		return 1
+	}
+	return *s.Limit
+}
+
+func (s QueryLimitOffset) GetPage() int64 {
+	if s.Page == nil {
+		return 1
+	}
+	return *s.Page
+}
+
+func (s QueryLimitOffset) GetOffset() int64 {
+	if s.Page != nil {
+		return (*s.Page - 1) * s.GetLimit()
+	}
+	if s.Offset != nil && *s.Offset >= 0 {
+		return *s.Offset
+	}
+	return 0
+}
+
+type QueryOrder string // sorting field1:a,field2:d,field3:a... OR StringToHexFunc(field1:a,field2:d,field3:a...)
+
+func (s QueryOrder) GetOrder(adjusts ...func(item string) (string, error)) string {
+	orderBy := strings.TrimSpace(string(s))
+	if orderBy == "" {
+		return ""
+	}
+	for i := len(adjusts) - 1; i >= 0; i-- {
+		if adjusts[i] != nil {
+			adjusted, err := adjusts[i](orderBy)
+			if err != nil {
+				return ""
+			}
+			orderBy = adjusted
+			break
+		}
+	}
+	return orderBy
 }
