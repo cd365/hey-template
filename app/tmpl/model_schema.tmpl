@@ -8,6 +8,7 @@ import (
     "database/sql"
     "fmt"
     "github.com/cd365/hey/v2"
+    "reflect"
     "regexp"
     "strconv"
     "strings"
@@ -180,19 +181,20 @@ func (s QueryIndexValueMaxMin) HasIndexValueMin() bool {
 	return s.IndexValueMin != nil && s.IndexValueMax == nil
 }
 
-// UseMaxOrMinValue column value type must be integer.
-func (s QueryIndexValueMaxMin) UseMaxOrMinValue(column string, filter hey.Filter) {
-	if (s.IndexValueMax != nil && s.IndexValueMin != nil) || column == "" || filter == nil {
-		return
+func (s QueryIndexValueMaxMin) UseIndexValueMax(column string, filter hey.Filter) bool {
+	if !s.HasIndexValueMax() || column == "" || filter == nil {
+		return false
 	}
-	if s.IndexValueMax != nil {
-		filter.LessThan(column, *s.IndexValueMax)
-		return
+	filter.LessThan(column, *s.IndexValueMax)
+	return true
+}
+
+func (s QueryIndexValueMaxMin) UseIndexValueMin(column string, filter hey.Filter) bool {
+	if !s.HasIndexValueMin() || column == "" || filter == nil {
+		return false
 	}
-	if s.IndexValueMin != nil {
-		filter.GreaterThan(column, *s.IndexValueMin)
-		return
-	}
+	filter.GreaterThan(column, *s.IndexValueMin)
+	return true
 }
 
 func NewIndexValueMax(maxValue int64) *QueryIndexValueMaxMin {
@@ -204,83 +206,116 @@ func NewIndexValueMin(minValue int64) *QueryIndexValueMaxMin {
 }
 
 var (
-	// regexpQueryTimeStartEnd column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
-	regexpQueryTimeStartEnd = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
+	// regexpQueryTimeDuration column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
+	regexpQueryTimeDuration = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
 )
 
-type QueryTimeStartEnd string // time duration `min-value,max-value` example format: `1701234567,1701320967` OR `1701234567000,1701320967000` OR `2006-01-02,2006-01-03` OR `2006-01-02 15:04:05,2006-01-03 15:04:05`
+type QueryTimeDuration string // time duration `min-value,max-value` example format: `1701234567,1701320967` OR `1701234567000,1701320967000` OR `2006-01-02,2006-01-03` OR `2006-01-02 15:04:05,2006-01-03 15:04:05`
 
-// UseTimeStartEnd column BETWEEN `start` AND `end`
-func (s QueryTimeStartEnd) UseTimeStartEnd(column string, filter hey.Filter) {
-	if column == "" || filter == nil {
-		return
-	}
-	if !regexpQueryTimeStartEnd.MatchString(string(s)) {
-		return
+func (s QueryTimeDuration) splitTimeDuration() []string {
+	if !regexpQueryTimeDuration.MatchString(string(s)) {
+		return nil
 	}
 	splits := strings.Split(string(s), ",")
 	if len(splits) != 2 {
-		return
+		return nil
 	}
-	between := make([]interface{}, 0, 2)
-	timestamp := 0
-	date := 0
-	datetime := 0
+	return splits
+}
+
+func (s QueryTimeDuration) splitTimeDurationUseTimestamp(column string, filter hey.Filter, splits []string) bool {
+	if column == "" || filter == nil {
+		return false
+	}
+	length := len(splits)
+	if length != 2 {
+		return false
+	}
+	lists := make([]interface{}, 0, length)
 	for _, tmp := range splits {
-		if i64, err := strconv.ParseInt(tmp, 10, 64); err == nil {
-			if i64 <= 0 {
-				return
-			}
-			length := len(tmp)
-			if length != 10 && length != 13 && length != 16 && length != 19 {
-				return
-			}
-			between = append(between, i64)
-			timestamp++
-			continue
-		}
-		if len(tmp) == 10 {
-			timeDate, err := time.Parse(time.DateOnly, tmp)
-			if err != nil {
-				return
-			}
-			between = append(between, timeDate)
-			date++
-			continue
-		}
-		timeDatetime, err := time.Parse(time.DateTime, tmp)
+		i64, err := strconv.ParseInt(tmp, 10, 64)
 		if err != nil {
-			return
+			return false
 		}
-		between = append(between, timeDatetime)
-		datetime++
+		if i64 <= 0 {
+			return false
+		}
+		lists = append(lists, i64)
 	}
-	if timestamp == 2 {
-		if between[0].(int64) > between[1].(int64) {
-			return
-		}
-		filter.Between(column, between[0], between[1])
-		return
+	if len(splits[0]) != len(splits[1]) {
+		return false
 	}
-	if date == 2 {
-		if between[0].(time.Time).Unix() > between[1].(time.Time).Unix() {
-			return
+	difference := lists[1].(int64) - lists[0].(int64)
+	if difference < 0 {
+		return false
+	}
+	if difference == 0 {
+		filter.Equal(column, lists[0].(int64))
+	} else {
+		filter.Between(column, lists[0], lists[1])
+	}
+	return true
+}
+
+func (s QueryTimeDuration) splitTimeDurationUseDateOrDatetime(column string, filter hey.Filter, splits []string, timeLayout string) bool {
+	if column == "" || filter == nil || len(splits) != 2 {
+		return false
+	}
+	lists := make([]interface{}, 0, 2)
+	for _, tmp := range splits {
+		timeDate, err := time.Parse(timeLayout, tmp)
+		if err != nil {
+			return false
 		}
+		lists = append(lists, timeDate)
+	}
+	if len(lists) != 2 {
+		return false
+	}
+	difference := lists[1].(time.Time).Unix() - lists[0].(time.Time).Unix()
+	if difference < 0 {
+		return false
+	}
+	if difference == 0 {
+		filter.Equal(column, splits[0])
+	} else {
 		filter.Between(column, splits[0], splits[1])
-		return
 	}
-	if datetime == 2 {
-		if between[0].(time.Time).Unix() > between[1].(time.Time).Unix() {
-			return
-		}
-		filter.Between(column, splits[0], splits[1])
-		return
+	return true
+}
+
+func (s QueryTimeDuration) UseTimeDurationTimestamp(column string, filter hey.Filter) bool {
+	return s.splitTimeDurationUseTimestamp(column, filter, s.splitTimeDuration())
+}
+
+func (s QueryTimeDuration) UseTimeDurationDate(column string, filter hey.Filter) bool {
+	return s.splitTimeDurationUseDateOrDatetime(column, filter, s.splitTimeDuration(), time.DateOnly)
+}
+
+func (s QueryTimeDuration) UseTimeDurationDatetime(column string, filter hey.Filter) bool {
+	return s.splitTimeDurationUseDateOrDatetime(column, filter, s.splitTimeDuration(), time.DateTime)
+}
+
+func (s QueryTimeDuration) UseTimeDuration(column string, filter hey.Filter) bool {
+	splits := s.splitTimeDuration()
+	if splits == nil {
+		return false
 	}
+	if s.splitTimeDurationUseTimestamp(column, filter, splits) {
+		return true
+	}
+	if s.splitTimeDurationUseDateOrDatetime(column, filter, splits, time.DateOnly) {
+		return true
+	}
+	if s.splitTimeDurationUseDateOrDatetime(column, filter, splits, time.DateTime) {
+		return true
+	}
+	return false
 }
 
 type QueryIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
 
-func (s QueryIn) UseInInt(column string, filter hey.Filter) {
+func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) {
 	if column == "" || filter == nil {
 		return
 	}
@@ -289,11 +324,23 @@ func (s QueryIn) UseInInt(column string, filter hey.Filter) {
 	if length == 0 {
 		return
 	}
+	var adjust func(item int64) (int64, error)
+	for i := len(adjusts) - 1; i >= 0; i-- {
+		if adjusts[i] != nil {
+			adjust = adjusts[i]
+			break
+		}
+	}
 	lists := make([]interface{}, 0, length)
 	for _, tmp := range splits {
 		if i64, err := strconv.ParseInt(tmp, 10, 64); err != nil {
 			return
 		} else {
+			if adjust != nil {
+				if i64, err = adjust(i64); err == nil {
+					return
+				}
+			}
 			lists = append(lists, i64)
 		}
 	}

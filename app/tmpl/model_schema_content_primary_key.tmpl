@@ -72,7 +72,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsert(primaryKey Prima
 // PrimaryKeyUpdateAll Batch update based on primary key value.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(context.TODO(), func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyUpdate(tmp, nil, tx); err != nil {
 				return err
@@ -91,7 +91,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpdateAll(way *hey.Way,
 // PrimaryKeyHiddenAll Batch hidden based on primary key value.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(context.TODO(), func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyHidden(tmp, nil, tx); err != nil {
 				return err
@@ -110,7 +110,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyHiddenAll(way *hey.Way,
 // PrimaryKeyDeleteAll Batch delete based on primary key value.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyDeleteAll(way *hey.Way, pks ...PrimaryKey) (int64, error) {
 	var total int64
-	err := s.Way(way).Transaction(nil, func(tx *hey.Way) error {
+	err := s.Way(way).Transaction(context.TODO(), func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if num, err := s.PrimaryKeyDelete(tmp, nil, tx); err != nil {
 				return err
@@ -131,7 +131,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) PrimaryKeyUpsertAll(way *hey.Way,
 	var total int64
 	var err error
     var num int64
-	err = s.Way(way).Transaction(nil, func(tx *hey.Way) error {
+	err = s.Way(way).Transaction(context.TODO(), func(tx *hey.Way) error {
 		for _, tmp := range pks {
 			if tmp == nil {
                 continue
