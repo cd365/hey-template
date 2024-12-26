@@ -8,7 +8,6 @@ import (
     "database/sql"
     "fmt"
     "github.com/cd365/hey/v2"
-    "reflect"
     "regexp"
     "strconv"
     "strings"
@@ -315,14 +314,14 @@ func (s QueryTimeDuration) UseTimeDuration(column string, filter hey.Filter) boo
 
 type QueryIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
 
-func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) {
+func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) bool {
 	if column == "" || filter == nil {
-		return
+		return false
 	}
 	splits := strings.Split(strings.ReplaceAll(string(s), " ", ""), ",")
 	length := len(splits)
 	if length == 0 {
-		return
+		return false
 	}
 	var adjust func(item int64) (int64, error)
 	for i := len(adjusts) - 1; i >= 0; i-- {
@@ -334,27 +333,28 @@ func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item
 	lists := make([]interface{}, 0, length)
 	for _, tmp := range splits {
 		if i64, err := strconv.ParseInt(tmp, 10, 64); err != nil {
-			return
+			return false
 		} else {
 			if adjust != nil {
 				if i64, err = adjust(i64); err == nil {
-					return
+					return false
 				}
 			}
 			lists = append(lists, i64)
 		}
 	}
 	filter.In(column, lists...)
+	return true
 }
 
-func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) {
+func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) bool {
 	if column == "" || filter == nil {
-		return
+		return false
 	}
 	splits := strings.Split(strings.TrimSpace(string(s)), ",")
 	length := len(splits)
 	if length == 0 {
-		return
+		return false
 	}
 	var adjust func(item string) (string, error)
 	for i := len(adjusts) - 1; i >= 0; i-- {
@@ -367,7 +367,7 @@ func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(i
 	for _, tmp := range splits {
 		if adjust != nil {
 			if item, err := adjust(tmp); err != nil {
-				return
+				return false
 			} else {
 				tmp = item
 			}
@@ -375,6 +375,7 @@ func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(i
 		lists = append(lists, tmp)
 	}
 	filter.In(column, lists...)
+	return true
 }
 
 type QueryKeyword string // search keyword [1,32]
@@ -383,10 +384,12 @@ func (s QueryKeyword) GetKeyword() string {
 	return fmt.Sprintf("%%%s%%", s)
 }
 
-func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) {
-	if s != "" && filter != nil {
-		filter.Like(column, s.GetKeyword())
+func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) bool {
+	if s == "" || column == "" || filter == nil {
+		return false
 	}
+	filter.Like(column, s.GetKeyword())
+	return true
 }
 
 type QueryLimitOffset struct {
