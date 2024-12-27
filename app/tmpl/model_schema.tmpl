@@ -426,7 +426,7 @@ type QueryLimitOffset struct {
 
 	Offset *int64 `json:"offset" query:"offset" form:"offset" validate:"omitempty,min=0,max=100000"` // offset value [0,100000]
 
-	Page *int64 `json:"page" query:"page" form:"page" validate:"omitempty,min=1"` // page value [1,+∞]
+	Page *int64 `json:"page" query:"page" form:"page" validate:"omitempty,min=1"` // page value [1,+∞)
 }
 
 func (s QueryLimitOffset) GetLimit() int64 {
