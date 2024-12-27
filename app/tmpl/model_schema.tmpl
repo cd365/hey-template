@@ -6,6 +6,7 @@ package {{{.Package}}}
 import (
     "context"
     "database/sql"
+    "encoding/hex"
     "fmt"
     "github.com/cd365/hey/v2"
     "regexp"
@@ -204,6 +205,22 @@ func NewIndexValueMin(minValue int64) *QueryIndexValueMaxMin {
 	return &QueryIndexValueMaxMin{IndexValueMin: &minValue}
 }
 
+type QueryKeyword struct {
+	Keyword *string `json:"keyword" query:"keyword" form:"keyword" validate:"omitempty,min=1,max=32"` // search keyword
+}
+
+func (s QueryKeyword) GetKeyword() string {
+	return fmt.Sprintf("%%%s%%", *s.Keyword)
+}
+
+func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) bool {
+	if s.Keyword != nil && *s.Keyword != "" || column == "" || filter == nil {
+		return false
+	}
+	filter.Like(column, s.GetKeyword())
+	return true
+}
+
 var (
 	// regexpQueryTimeDuration column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
 	regexpQueryTimeDuration = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
@@ -312,9 +329,9 @@ func (s QueryTimeDuration) UseTimeDuration(column string, filter hey.Filter) boo
 	return false
 }
 
-type QueryIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
+type QueryFilterIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
 
-func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) bool {
+func (s QueryFilterIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) bool {
 	if column == "" || filter == nil {
 		return false
 	}
@@ -347,7 +364,7 @@ func (s QueryIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item
 	return true
 }
 
-func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) bool {
+func (s QueryFilterIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) bool {
 	if column == "" || filter == nil {
 		return false
 	}
@@ -378,18 +395,30 @@ func (s QueryIn) UseInString(column string, filter hey.Filter, adjusts ...func(i
 	return true
 }
 
-type QueryKeyword string // search keyword [1,32]
+type QueryOrder string // sorting field1:a,field2:d,field3:a... OR StringToHexFunc(field1:a,field2:d,field3:a...)
 
-func (s QueryKeyword) GetKeyword() string {
-	return fmt.Sprintf("%%%s%%", s)
-}
-
-func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) bool {
-	if s == "" || column == "" || filter == nil {
-		return false
+func (s QueryOrder) GetOrder(adjusts ...func(item string) (string, error)) string {
+	orderBy := strings.TrimSpace(string(s))
+	if orderBy == "" {
+		return ""
 	}
-	filter.Like(column, s.GetKeyword())
-	return true
+	if adjusts == nil {
+		// try calling hex.DecodeString()
+		if bts, err := hex.DecodeString(orderBy); err == nil {
+			orderBy = string(bts)
+		}
+	}
+	for i := len(adjusts) - 1; i >= 0; i-- {
+		if adjusts[i] != nil {
+			adjusted, err := adjusts[i](orderBy)
+			if err != nil {
+				return ""
+			}
+			orderBy = adjusted
+			break
+		}
+	}
+	return orderBy
 }
 
 type QueryLimitOffset struct {
@@ -422,24 +451,4 @@ func (s QueryLimitOffset) GetOffset() int64 {
 		return *s.Offset
 	}
 	return 0
-}
-
-type QueryOrder string // sorting field1:a,field2:d,field3:a... OR StringToHexFunc(field1:a,field2:d,field3:a...)
-
-func (s QueryOrder) GetOrder(adjusts ...func(item string) (string, error)) string {
-	orderBy := strings.TrimSpace(string(s))
-	if orderBy == "" {
-		return ""
-	}
-	for i := len(adjusts) - 1; i >= 0; i-- {
-		if adjusts[i] != nil {
-			adjusted, err := adjusts[i](orderBy)
-			if err != nil {
-				return ""
-			}
-			orderBy = adjusted
-			break
-		}
-	}
-	return orderBy
 }
