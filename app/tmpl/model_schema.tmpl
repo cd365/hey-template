@@ -115,7 +115,7 @@ type Database struct {
 	{{{.DatabaseAttributeDefine}}}
 }
 
-func NewDatabase(ctx context.Context, way *hey.Way) *Database {
+func NewDatabase(ctx context.Context, way *hey.Way, initialize func(db *Database) error) (*Database, error) {
     basic := Basic{
         ctx:                ctx,
         sqlExecuteMaxDuration: time.Minute,
@@ -129,7 +129,12 @@ func NewDatabase(ctx context.Context, way *hey.Way) *Database {
     tmp.schemaSlice = []string{
         {{{.NewDatabaseAttributeAssignSlice}}}
     }
-    return tmp
+    if initialize != nil {
+        if err := initialize(tmp); err != nil {
+            return nil, err
+        }
+    }
+    return tmp, nil
 }
 
 func (s *Database) TableMap() map[string]Table {
@@ -158,10 +163,14 @@ type Database{{{.Schema}}} struct {
 	db *Database
 }
 
-func NewDatabase{{{.Schema}}}(ctx context.Context, way *hey.Way) *Database{{{.Schema}}} {
+func NewDatabase{{{.Schema}}}(ctx context.Context, way *hey.Way, initialize func(db *Database) error) (*Database{{{.Schema}}}, error) {
+    tmp, err := NewDatabase(ctx, way, initialize)
+    if err != nil {
+        return nil, err
+    }
 	return &Database{{{.Schema}}}{
-		db: NewDatabase(ctx, way),
-	}
+		db: tmp,
+	}, nil
 }
 
 func (s *Database{{{.Schema}}}) Database() *Database {
