@@ -21,6 +21,8 @@ type {{{.Schema}}}{{{.OriginNamePascal}}} struct {
 
     basic *Basic
     way *hey.Way
+    table string
+    comment string
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Basic() *Basic {
@@ -28,11 +30,11 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Basic() *Basic {
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Table() string {
-	return "{{{.OriginNameWithPrefix}}}"
+	return s.table
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Comment() string {
-	return "{{{.Comment}}}"
+	return s.comment
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Column(except ...string) []string {
@@ -103,6 +105,18 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ColumnUpdatedAt() []string {
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ColumnDeletedAt() []string {
 	return {{{.ColumnDeletedAt}}}
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ChangeTableName(table string) {
+	s.table = table
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ChangeTableComment(comment string) {
+	s.comment = comment
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ChangeTableColumn(columnSlice []string) {
+	s.columnSlice = columnSlice
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Filter(filters ...func(f hey.Filter)) hey.Filter {
@@ -444,6 +458,8 @@ func new{{{.Schema}}}{{{.OriginNamePascal}}}(basic Basic, way *hey.Way) *{{{.Sch
 	s.columnSlice = {{{.StructColumnSchemaValuesAccess}}}
 	s.basic = &basic
 	s.way = way
+	s.table = "{{{.OriginNameWithPrefix}}}"
+	s.comment = "{{{.Comment}}}"
 	return s
 }
 

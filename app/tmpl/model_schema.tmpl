@@ -43,6 +43,9 @@ type Table interface {
     ColumnCreatedAt() []string
     ColumnUpdatedAt() []string
     ColumnDeletedAt() []string
+    ChangeTableName(table string)
+    ChangeTableComment(comment string)
+    ChangeTableColumn(columnSlice []string)
 
     Filter(filters ...func(f hey.Filter)) hey.Filter
     Add(ways ...*hey.Way) *hey.Add
