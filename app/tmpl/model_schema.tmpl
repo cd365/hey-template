@@ -31,7 +31,7 @@ type PrimaryKey interface {
 }
 
 type Table interface {
-    Basic() *Basic
+    Basic() *BASIC
     Table() string
     Comment() string
     Column(except ...string) []string
@@ -93,7 +93,7 @@ type Table interface {
     ValueSliceStructPtr(capacities ...int) interface{}
 }
 
-type Basic struct {
+type BASIC struct {
 	// ctx Execute sql default context.
 	ctx context.Context
 
@@ -101,11 +101,15 @@ type Basic struct {
 	sqlExecuteMaxDuration time.Duration
 }
 
-func (s *Basic) SetSqlExecuteMaxDuration(duration time.Duration) *Basic {
+func (s *BASIC) SetSqlExecuteMaxDuration(duration time.Duration) *BASIC {
 	if duration > 0 {
 		s.sqlExecuteMaxDuration = duration
 	}
 	return s
+}
+
+type COUNT struct {
+	Count int64 `db:"counts"`
 }
 
 type Database struct {
@@ -116,7 +120,7 @@ type Database struct {
 }
 
 func NewDatabase(ctx context.Context, way *hey.Way, initialize func(db *Database) error) (*Database, error) {
-    basic := Basic{
+    basic := BASIC{
         ctx:                ctx,
         sqlExecuteMaxDuration: time.Minute,
     }
@@ -160,21 +164,21 @@ func (s *Database) TableExists(table string) bool {
 
 /* common structures for querying data */
 
-// QueryIndexValueMaxMin MAX or MIN index value.
-type QueryIndexValueMaxMin struct {
+// SelectIndexValueMaxMin MAX or MIN index value.
+type SelectIndexValueMaxMin struct {
 	IndexValueMax *int64 `json:"index_max" query:"index_max" form:"index_max" validate:"omitempty,min=0"` // maximum (index or serial) value
 	IndexValueMin *int64 `json:"index_min" query:"index_min" form:"index_min" validate:"omitempty,min=0"` // minimum (index or serial) value
 }
 
-func (s QueryIndexValueMaxMin) HasIndexValueMax() bool {
+func (s SelectIndexValueMaxMin) HasIndexValueMax() bool {
 	return s.IndexValueMax != nil && s.IndexValueMin == nil
 }
 
-func (s QueryIndexValueMaxMin) HasIndexValueMin() bool {
+func (s SelectIndexValueMaxMin) HasIndexValueMin() bool {
 	return s.IndexValueMin != nil && s.IndexValueMax == nil
 }
 
-func (s QueryIndexValueMaxMin) UseIndexValueMax(column string, filter hey.Filter) bool {
+func (s SelectIndexValueMaxMin) UseIndexValueMax(column string, filter hey.Filter) bool {
 	if !s.HasIndexValueMax() || column == "" || filter == nil {
 		return false
 	}
@@ -182,7 +186,7 @@ func (s QueryIndexValueMaxMin) UseIndexValueMax(column string, filter hey.Filter
 	return true
 }
 
-func (s QueryIndexValueMaxMin) UseIndexValueMin(column string, filter hey.Filter) bool {
+func (s SelectIndexValueMaxMin) UseIndexValueMin(column string, filter hey.Filter) bool {
 	if !s.HasIndexValueMin() || column == "" || filter == nil {
 		return false
 	}
@@ -190,23 +194,15 @@ func (s QueryIndexValueMaxMin) UseIndexValueMin(column string, filter hey.Filter
 	return true
 }
 
-func NewIndexValueMax(maxValue int64) *QueryIndexValueMaxMin {
-	return &QueryIndexValueMaxMin{IndexValueMax: &maxValue}
-}
-
-func NewIndexValueMin(minValue int64) *QueryIndexValueMaxMin {
-	return &QueryIndexValueMaxMin{IndexValueMin: &minValue}
-}
-
-type QueryKeyword struct {
+type SelectKeyword struct {
 	Keyword *string `json:"keyword" query:"keyword" form:"keyword" validate:"omitempty,min=1,max=32"` // search keyword
 }
 
-func (s QueryKeyword) GetKeyword() string {
+func (s SelectKeyword) GetKeyword() string {
 	return fmt.Sprintf("%%%s%%", *s.Keyword)
 }
 
-func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) bool {
+func (s SelectKeyword) UseKeyword(column string, filter hey.Filter) bool {
 	if s.Keyword != nil && *s.Keyword != "" || column == "" || filter == nil {
 		return false
 	}
@@ -215,14 +211,14 @@ func (s QueryKeyword) UseKeyword(column string, filter hey.Filter) bool {
 }
 
 var (
-	// regexpQueryTimeDuration column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
-	regexpQueryTimeDuration = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
+	// regexpSelectTimeDuration column BETWEEN start AND end; "1701234567,1701320967" OR "1701234567000,1701320967000" OR "2006-01-02,2006-01-03" OR "2006-01-02 15:04:05,2006-01-03 15:04:05"
+	regexpSelectTimeDuration = regexp.MustCompile(`^([1-9][0-9]{9},[1-9][0-9]{9})|([1-9][0-9]{12},[1-9][0-9]{12})|([12][0-9]{3}-[01][0-9]-[0123][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9])|([12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9],[12][0-9]{3}-[01][0-9]-[0123][0-9] [012][0-9]:[012345][0-9]:[012345][0-9])$`)
 )
 
-type QueryTimeDuration string // time duration `min-value,max-value` example format: `1701234567,1701320967` OR `1701234567000,1701320967000` OR `2006-01-02,2006-01-03` OR `2006-01-02 15:04:05,2006-01-03 15:04:05`
+type SelectTimeDuration string // time duration `min-value,max-value` example format: `1701234567,1701320967` OR `1701234567000,1701320967000` OR `2006-01-02,2006-01-03` OR `2006-01-02 15:04:05,2006-01-03 15:04:05`
 
-func (s QueryTimeDuration) splitTimeDuration() []string {
-	if !regexpQueryTimeDuration.MatchString(string(s)) {
+func (s SelectTimeDuration) splitTimeDuration() []string {
+	if !regexpSelectTimeDuration.MatchString(string(s)) {
 		return nil
 	}
 	splits := strings.Split(string(s), ",")
@@ -232,7 +228,7 @@ func (s QueryTimeDuration) splitTimeDuration() []string {
 	return splits
 }
 
-func (s QueryTimeDuration) splitTimeDurationUseTimestamp(column string, filter hey.Filter, splits []string) bool {
+func (s SelectTimeDuration) splitTimeDurationUseTimestamp(column string, filter hey.Filter, splits []string) bool {
 	if column == "" || filter == nil {
 		return false
 	}
@@ -266,7 +262,7 @@ func (s QueryTimeDuration) splitTimeDurationUseTimestamp(column string, filter h
 	return true
 }
 
-func (s QueryTimeDuration) splitTimeDurationUseDateOrDatetime(column string, filter hey.Filter, splits []string, timeLayout string) bool {
+func (s SelectTimeDuration) splitTimeDurationUseDateOrDatetime(column string, filter hey.Filter, splits []string, timeLayout string) bool {
 	if column == "" || filter == nil || len(splits) != 2 {
 		return false
 	}
@@ -293,19 +289,19 @@ func (s QueryTimeDuration) splitTimeDurationUseDateOrDatetime(column string, fil
 	return true
 }
 
-func (s QueryTimeDuration) UseTimeDurationTimestamp(column string, filter hey.Filter) bool {
+func (s SelectTimeDuration) UseTimeDurationTimestamp(column string, filter hey.Filter) bool {
 	return s.splitTimeDurationUseTimestamp(column, filter, s.splitTimeDuration())
 }
 
-func (s QueryTimeDuration) UseTimeDurationDate(column string, filter hey.Filter) bool {
+func (s SelectTimeDuration) UseTimeDurationDate(column string, filter hey.Filter) bool {
 	return s.splitTimeDurationUseDateOrDatetime(column, filter, s.splitTimeDuration(), time.DateOnly)
 }
 
-func (s QueryTimeDuration) UseTimeDurationDatetime(column string, filter hey.Filter) bool {
+func (s SelectTimeDuration) UseTimeDurationDatetime(column string, filter hey.Filter) bool {
 	return s.splitTimeDurationUseDateOrDatetime(column, filter, s.splitTimeDuration(), time.DateTime)
 }
 
-func (s QueryTimeDuration) UseTimeDuration(column string, filter hey.Filter) bool {
+func (s SelectTimeDuration) UseTimeDuration(column string, filter hey.Filter) bool {
 	splits := s.splitTimeDuration()
 	if splits == nil {
 		return false
@@ -322,9 +318,9 @@ func (s QueryTimeDuration) UseTimeDuration(column string, filter hey.Filter) boo
 	return false
 }
 
-type QueryFilterIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
+type SelectWhereIn string // column IN ( ?, ?, ? ... )  example-integer: 1,2,3... example-string: a,2,c... OR hex("1"),hex("2"),hex("3")...
 
-func (s QueryFilterIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) bool {
+func (s SelectWhereIn) UseInInt(column string, filter hey.Filter, adjusts ...func(item int64) (int64, error)) bool {
 	if column == "" || filter == nil {
 		return false
 	}
@@ -357,7 +353,7 @@ func (s QueryFilterIn) UseInInt(column string, filter hey.Filter, adjusts ...fun
 	return true
 }
 
-func (s QueryFilterIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) bool {
+func (s SelectWhereIn) UseInString(column string, filter hey.Filter, adjusts ...func(item string) (string, error)) bool {
 	if column == "" || filter == nil {
 		return false
 	}
@@ -388,9 +384,9 @@ func (s QueryFilterIn) UseInString(column string, filter hey.Filter, adjusts ...
 	return true
 }
 
-type QueryOrder string // sorting field1:a,field2:d,field3:a... OR StringToHexFunc(field1:a,field2:d,field3:a...)
+type SelectOrder string // sorting field1:a,field2:d,field3:a... OR StringToHexFunc(field1:a,field2:d,field3:a...)
 
-func (s QueryOrder) GetOrder(adjusts ...func(item string) (string, error)) string {
+func (s SelectOrder) GetOrder(adjusts ...func(item string) (string, error)) string {
 	orderBy := strings.TrimSpace(string(s))
 	if orderBy == "" {
 		return ""
@@ -414,7 +410,7 @@ func (s QueryOrder) GetOrder(adjusts ...func(item string) (string, error)) strin
 	return orderBy
 }
 
-type QueryLimitOffset struct {
+type SelectLimitOffset struct {
 	Limit *int64 `json:"limit" query:"limit" form:"limit" validate:"omitempty,min=1,max=5000"` // page size [1,5000]
 
 	Offset *int64 `json:"offset" query:"offset" form:"offset" validate:"omitempty,min=0,max=100000"` // offset value [0,100000]
@@ -422,21 +418,21 @@ type QueryLimitOffset struct {
 	Page *int64 `json:"page" query:"page" form:"page" validate:"omitempty,min=1"` // page value [1,+∞)
 }
 
-func (s QueryLimitOffset) GetLimit() int64 {
+func (s SelectLimitOffset) GetLimit() int64 {
 	if s.Limit == nil {
 		return 1
 	}
 	return *s.Limit
 }
 
-func (s QueryLimitOffset) GetPage() int64 {
+func (s SelectLimitOffset) GetPage() int64 {
 	if s.Page == nil {
 		return 1
 	}
 	return *s.Page
 }
 
-func (s QueryLimitOffset) GetOffset() int64 {
+func (s SelectLimitOffset) GetOffset() int64 {
 	if s.Page != nil {
 		return (*s.Page - 1) * s.GetLimit()
 	}

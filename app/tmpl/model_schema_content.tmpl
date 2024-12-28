@@ -19,13 +19,13 @@ type {{{.Schema}}}{{{.OriginNamePascal}}} struct {
     columnMap map[string]*struct{}
     columnSlice []string
 
-    basic *Basic
+    basic *BASIC
     way *hey.Way
     table string
     comment string
 }
 
-func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Basic() *Basic {
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Basic() *BASIC {
 	return s.basic
 }
 
@@ -450,7 +450,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) SelectGetByColumn(column string, 
 	}, receive)
 }
 
-func new{{{.Schema}}}{{{.OriginNamePascal}}}(basic Basic, way *hey.Way) *{{{.Schema}}}{{{.OriginNamePascal}}} {
+func new{{{.Schema}}}{{{.OriginNamePascal}}}(basic BASIC, way *hey.Way) *{{{.Schema}}}{{{.OriginNamePascal}}} {
 	s := &{{{.Schema}}}{{{.OriginNamePascal}}}{
 {{{range $k, $v := .StructColumnSchemaValues}}}{{{$v}}}{{{end}}}
 	}
