@@ -511,15 +511,6 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ValueSliceStructPtr(capacities ..
     return make([]*{{{.OriginNamePascal}}}, 0, capacity)
 }
 
-type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
-    *{{{.Schema}}}{{{.OriginNamePascal}}}
-
-{{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
-
-    table string
-    alias string
-}
-
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
     alias := s.table
     if tmp := hey.LastNotEmptyString(aliases); tmp != "" {
@@ -535,6 +526,43 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Sch
 	}
 	tmp.{{{.Schema}}}{{{.OriginNamePascal}}} = s
 	return tmp
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasA() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasA)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasB() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasB)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasC() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasC)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasD() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasD)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasE() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasE)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasF() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasF)
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasG() *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+	return s.Alias(hey.AliasG)
+}
+
+type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
+    *{{{.Schema}}}{{{.OriginNamePascal}}}
+
+{{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
+
+    table string
+    alias string
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}Alias) Table() string {
