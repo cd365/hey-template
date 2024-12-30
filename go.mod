@@ -3,7 +3,7 @@ module github.com/cd365/hey-template
 go 1.18
 
 require (
-	github.com/cd365/hey/v2 v2.0.3
+	github.com/cd365/hey/v2 v2.0.6
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/google/wire v0.6.0
 	github.com/lib/pq v1.10.9

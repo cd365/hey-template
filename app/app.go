@@ -180,9 +180,10 @@ type TmplTableModel struct {
 	StructColumnAdd                   []string // 表结构体字段定义 ==> Name *string `json:"name" db:"name"` // 名称
 	StructColumnAddPrimaryKey         string   // 表结构体字段定义 ==> 添加结构体设置 PrimaryKey 方法
 
-	StructColumnSchemaValues          []string // NewHey.Attribute ==> Name:"name", // 名称
-	StructColumnSchemaValuesAccess    string   // NewHey.Access ==> Access:[]string{}, // 访问字段列表
-	StructColumnSchemaValuesAccessMap string   // NewHey.AccessMap ==> Access:map[string]struct{}, // 访问字段列表
+	StructColumnSchemaValues          []string // ==> NAME:"name", // 名称
+	StructColumnSchemaValuesAccess    string   // ==> Access:[]string{}, // 访问字段列表
+	StructColumnSchemaValuesAccessMap string   // ==> Access:map[string]struct{}, // 访问字段列表
+	StructColumnSchemaValuesAlias     []string // ==> NAME:s.NAME, // 名称
 
 	ColumnAutoIncr  string // 结构体字段方法 ColumnAutoIncr
 	ColumnCreatedAt string // 结构体字段方法 ColumnCreatedAt
@@ -247,6 +248,15 @@ func (s *TmplTableModel) prepare() error {
 				tmp = fmt.Sprintf("\n%s", tmp)
 			}
 			s.StructColumnSchemaValues = append(s.StructColumnSchemaValues, tmp)
+
+			alias := fmt.Sprintf("\t\t%s: column(s.%s),", upperName, upperName)
+			if comment != "" {
+				alias = fmt.Sprintf("%s // %s", alias, comment)
+			}
+			if i != 0 {
+				alias = fmt.Sprintf("\n%s", alias)
+			}
+			s.StructColumnSchemaValuesAlias = append(s.StructColumnSchemaValuesAlias, alias)
 		}
 
 		{

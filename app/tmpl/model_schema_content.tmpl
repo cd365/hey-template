@@ -510,3 +510,37 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ValueSliceStructPtr(capacities ..
     }
     return make([]*{{{.OriginNamePascal}}}, 0, capacity)
 }
+
+type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
+{{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
+
+    table string
+    alias string
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
+    alias := hey.LastNotEmptyString(aliases)
+    column := func(column string) string { return column }
+    if alias != "" {
+        adjust := s.way.T().SetAlias(alias)
+        column = func(column string) string { return adjust.Column(column) }
+    }
+	tmp := &{{{.Schema}}}{{{.OriginNamePascal}}}Alias{
+{{{range $k, $v := .StructColumnSchemaValuesAlias}}}{{{$v}}}{{{end}}}
+
+        table: s.table,
+        alias: alias,
+	}
+	return tmp
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}Alias) Table() string {
+	return s.table
+}
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}Alias) Alias() string {
+	if s.alias != "" {
+		return s.alias
+	}
+	return s.Table()
+}
