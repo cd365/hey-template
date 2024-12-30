@@ -575,3 +575,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}Alias) Alias() string {
 	}
 	return s.Table()
 }
+
+func (s *{{{.Schema}}}{{{.OriginNamePascal}}}Alias) Model() *{{{.Schema}}}{{{.OriginNamePascal}}} {
+	return s.{{{.Schema}}}{{{.OriginNamePascal}}}
+}
