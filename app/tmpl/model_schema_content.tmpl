@@ -525,6 +525,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Sch
         alias: alias,
 	}
 	tmp.{{{.Schema}}}{{{.OriginNamePascal}}} = s
+	tmp.Adjust = adjust
 	return tmp
 }
 
@@ -558,6 +559,8 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) AliasG() *{{{.Schema}}}{{{.Origin
 
 type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
     *{{{.Schema}}}{{{.OriginNamePascal}}}
+
+    Adjust *hey.AdjustColumn
 
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
 
