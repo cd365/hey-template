@@ -241,7 +241,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) InsertSelect(columns []string, ge
 
 // SelectCount SQL SELECT COUNT.
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) SelectCount(where hey.Filter, ways ...*hey.Way) (int64, error) {
-	return s.Get(ways...).Where(where).Count()
+	return s.Get(ways...).Column(s.columnSlice[0]).Where(where).Count()
 }
 
 // SelectQuery SQL SELECT.
