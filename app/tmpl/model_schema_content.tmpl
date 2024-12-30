@@ -513,7 +513,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ValueSliceStructPtr(capacities ..
 
 type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
     *{{{.Schema}}}{{{.OriginNamePascal}}}
-    
+
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
 
     table string
@@ -521,12 +521,12 @@ type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
 }
 
 func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Schema}}}{{{.OriginNamePascal}}}Alias {
-    alias := hey.LastNotEmptyString(aliases)
-    column := func(column string) string { return column }
-    if alias != "" {
-        adjust := s.way.T().SetAlias(alias)
-        column = func(column string) string { return adjust.Column(column) }
+    alias := s.table
+    if tmp := hey.LastNotEmptyString(aliases); tmp != "" {
+        alias = tmp
     }
+    adjust := s.way.T().SetAlias(alias)
+    column := func(column string) string { return adjust.Column(column) }
 	tmp := &{{{.Schema}}}{{{.OriginNamePascal}}}Alias{
 {{{range $k, $v := .StructColumnSchemaValuesAlias}}}{{{$v}}}{{{end}}}
 
