@@ -512,6 +512,8 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) ValueSliceStructPtr(capacities ..
 }
 
 type {{{.Schema}}}{{{.OriginNamePascal}}}Alias struct {
+    *{{{.Schema}}}{{{.OriginNamePascal}}}
+    
 {{{range $k, $v := .StructColumnSchema}}}{{{$v}}}{{{end}}}
 
     table string
@@ -531,6 +533,7 @@ func (s *{{{.Schema}}}{{{.OriginNamePascal}}}) Alias(aliases ...string) *{{{.Sch
         table: s.table,
         alias: alias,
 	}
+	tmp.{{{.Schema}}}{{{.OriginNamePascal}}} = s
 	return tmp
 }
 
