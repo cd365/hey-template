@@ -109,7 +109,7 @@ func (s *BASIC) SetSqlExecuteMaxDuration(duration time.Duration) *BASIC {
 }
 
 type COUNT struct {
-	Count int64 `db:"counts"` // total number of rows
+	Count int64 `json:"counts" db:"counts"` // total number of rows
 }
 
 type Database struct {
